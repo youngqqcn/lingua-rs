@@ -1,6 +1,7 @@
 import csv
 import opencc
 from lingua import Language, LanguageDetectorBuilder
+from cantofilter.judge import find_canto_unique, LanguageType
 
 # 创建语言检测器
 languages = [
@@ -12,6 +13,13 @@ languages = [
     Language.SPANISH,
     Language.PORTUGUESE,
     Language.INDONESIAN,
+    Language.VIETNAMESE,
+    Language.RUSSIAN,
+    Language.GERMAN,
+    Language.FRENCH,
+    Language.ITALIAN,
+    Language.THAI,
+
 ]
 detector = LanguageDetectorBuilder.from_languages(*languages).build()
 
@@ -30,6 +38,7 @@ LANG_NAME_MAP = {
     Language.GERMAN: "German",
     Language.FRENCH: "French",
     Language.ITALIAN: "Italian",
+    Language.THAI: "Thai",
 }
 
 # 创建OpenCC转换器
@@ -84,6 +93,32 @@ def is_traditional_chinese(text):
     # diff_s < diff_t 说明原文更接近简体
     return diff_t < diff_s
 
+def is_cantonese(text):
+    """使用canto-filter检测文本是否包含粤语特征
+
+    canto-filter使用正则表达式检测粤语特征字词，
+    输入应为繁体中文，因此先用OpenCC将简体转为繁体。
+    如果检测到CANTONESE或MIXED类型，返回True。
+    """
+    if not text or not text.strip():
+        return False
+
+    # 纯ASCII文本不是粤语
+    if text.isascii():
+        return False
+
+    # 检查是否包含中文字符
+    has_chinese = any("\u4e00" <= c <= "\u9fff" for c in text)
+    if not has_chinese:
+        return False
+
+    # canto-filter默认使用繁体中文
+    # 如果原文是简体，先转换为繁体
+    traditional_text = s2t_converter.convert(text)
+
+    # 使用canto-filter检测
+    return find_canto_unique(traditional_text)
+
 def detect_language(text):
     """使用lingua-py检测文本语言，返回英文语言名称"""
     if not text or not text.strip():
@@ -96,8 +131,10 @@ def detect_language(text):
     try:
         lang = detector.detect_language_of(text)
 
-        # 特殊处理中文：检查是否为繁体
+        # 特殊处理中文：先检查是否为粤语，再检查简繁体
         if lang == Language.CHINESE:
+            if is_cantonese(text):
+                return "Cantonese"
             if is_traditional_chinese(text):
                 return "Chinese(Traditional)"
             return "Chinese(Simplified)"
