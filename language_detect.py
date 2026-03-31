@@ -276,6 +276,9 @@ def detect_language(text: str) -> str | None:
             if has_hiragana or has_katakana:
                 return "Japanese"
 
+            if has_hangul:
+                return "Korean"
+
             if has_thai:
                 return "Thai"
 
