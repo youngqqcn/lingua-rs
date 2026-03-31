@@ -209,46 +209,62 @@ def is_traditional_chinese(text):
 # 语言检测函数
 # =============================================================================
 
-def detect_language(text: str) -> str | None:
-    """检测文本语言
+def _has_kana(text: str) -> bool:
+    """检查文本是否包含假名"""
+    return any("\u3040" <= c <= "\u309f" or "\u30a0" <= c <= "\u30ff" for c in text)
 
-    Args:
-        text: 输入文本
+
+def _detect_single_with_confidence(text: str) -> tuple[str | None, float]:
+    """单个文本的语言检测，返回(语言, 置信度)
 
     Returns:
-        语言字符串，如 "English", "Chinese(Simplified)", "Cantonese" 等
-        返回 None 表示文本被过滤（短文本等）
+        (语言, 置信度) 元组，置信度 0-1
     """
     if not text or not text.strip():
-        return None
+        return None, 0.0
 
-    # ========== 语言检测 ==========
     text = normalize_text(text)
 
     if text.isascii():
-        return "English"
+        return "English", 1.0
 
     text_no_emoji = remove_emoji(text)
     if text_no_emoji.isascii() and text_no_emoji.strip():
-        return "English"
+        return "English", 1.0
 
     try:
         lang = detector.detect_language_of(text)
+        confidences = detector.compute_language_confidence_values(text)
+
+        # 构建置信度字典
+        confidence_dict = {cv.language: cv.value for cv in confidences}
+
+        # 检查假名（优先级最高：只要有假名就是日语）
+        if _has_kana(text):
+            return "Japanese", 1.0
 
         if lang == Language.CHINESE:
+            # 获取中文相关的置信度
+            chinese_conf = confidence_dict.get(Language.CHINESE, 0.0)
+            japanese_conf = confidence_dict.get(Language.JAPANESE, 0.0)
+
             if has_cantonese_features(text):
-                return "Cantonese"
+                return "Cantonese", 1.0
             if is_traditional_chinese(text):
-                return "Chinese(Traditional)"
-            return "Chinese(Simplified)"
+                return "Chinese(Traditional)", 0.9
+
+            # 如果日文置信度接近中文，且文本较短参考历史
+            if japanese_conf > 0.3 and japanese_conf >= chinese_conf * 0.5:
+                return "Japanese", japanese_conf
+
+            return "Chinese(Simplified)", chinese_conf
 
         if lang is not None:
             detected = LANG_NAME_MAP.get(lang, str(lang))
+            detected_conf = confidence_dict.get(lang, 0.5)
 
             has_cjk = any("\u4e00" <= c <= "\u9fff" for c in text)
             has_chinese_punct = any(p in text for p in CHINESE_PUNCTUATION)
-            has_hiragana = any("\u3040" <= c <= "\u309f" for c in text)
-            has_katakana = any("\u30a0" <= c <= "\u30ff" for c in text)
             has_thai = any("\u0e00" <= c <= "\u0e7f" for c in text)
             has_hangul = any("\uac00" <= c <= "\ud7af" for c in text)
             has_cyrillic = any("\u0400" <= c <= "\u04ff" for c in text)
@@ -262,28 +278,25 @@ def detect_language(text: str) -> str | None:
 
             if has_cjk or has_chinese_punct:
                 if has_cantonese_features(text):
-                    return "Cantonese"
+                    return "Cantonese", 1.0
                 if is_traditional_chinese(text):
-                    return "Chinese(Traditional)"
-                return "Chinese(Simplified)"
-
-            if has_hiragana or has_katakana:
-                return "Japanese"
+                    return "Chinese(Traditional)", 0.9
+                return "Chinese(Simplified)", 0.9
 
             if has_hangul:
-                return "Korean"
+                return "Korean", 1.0
 
             if has_thai:
-                return "Thai"
+                return "Thai", 1.0
 
             if has_cyrillic and not is_latin_with_cyrillic_mix:
-                return "Russian"
+                return "Russian", 1.0
 
             if has_vietnamese:
-                return "Vietnamese"
+                return "Vietnamese", 1.0
 
-            return detected
-        return "English"
+            return detected, detected_conf
+        return "English", 0.5
     except Exception:
         has_cjk = any("\u4e00" <= c <= "\u9fff" for c in text)
         has_hiragana = any("\u3040" <= c <= "\u309f" for c in text)
@@ -294,18 +307,83 @@ def detect_language(text: str) -> str | None:
         has_vietnamese = any(c in 'ăâđêôơư' for c in text)
 
         if has_hiragana or has_katakana:
-            return "Japanese"
+            return "Japanese", 1.0
         if has_hangul:
-            return "Korean"
+            return "Korean", 1.0
         if has_thai:
-            return "Thai"
+            return "Thai", 1.0
         if has_cyrillic:
-            return "Russian"
+            return "Russian", 1.0
         if has_vietnamese:
-            return "Vietnamese"
+            return "Vietnamese", 1.0
         if has_cjk:
             if is_traditional_chinese(text):
-                return "Chinese(Traditional)"
-            return "Chinese(Simplified)"
+                return "Chinese(Traditional)", 0.9
+            return "Chinese(Simplified)", 0.9
 
-        return "English"
+        return "English", 0.5
+
+
+def _is_long_text(text: str) -> bool:
+    """判断是否为长文本（参与历史统计）"""
+    stripped = text.strip()
+    if stripped.isascii():
+        # 英文：>=5个单词
+        word_count = len(stripped.split())
+        return word_count >= 5
+    elif any("\u4e00" <= c <= "\u9fff" for c in stripped):
+        # 中文：>=5个汉字
+        chinese_count = sum(1 for c in stripped if "\u4e00" <= c <= "\u9fff")
+        return chinese_count >= 5
+    else:
+        # 其他：>=5个字符
+        return len(stripped) >= 5
+
+
+def detect_language(text: str, history: list[str] | None = None) -> str | None:
+    """检测文本语言
+
+    Args:
+        text: 输入文本
+        history: 历史文本列表，用于辅助判断短文本的语言
+                例如用户连续对话中，短文本 "ok" 可能与之前的中文内容相关
+
+    Returns:
+        语言字符串，如 "English", "Chinese(Simplified)", "Cantonese" 等
+        返回 None 表示文本无效
+    """
+    if not text or not text.strip():
+        return None
+
+    # 首先进行单文本检测（带置信度）
+    result, confidence = _detect_single_with_confidence(text)
+
+    # 定义需要检查的"强语言"列表（中文、韩语、日语、俄语、泰语、越南语）
+    STRONG_LANGUAGES = {
+        'Chinese(Simplified)', 'Chinese(Traditional)', 'Cantonese',
+        'Korean', 'Japanese', 'Russian', 'Thai', 'Vietnamese'
+    }
+
+    # 如果当前文本是长文本且为强语言，直接返回
+    if _is_long_text(text):
+        if result in STRONG_LANGUAGES:
+            return result
+
+    # 检查是否需要使用历史信息辅助判断
+    stripped = text.strip()
+
+    # 检测是否为纯数字（可能是手机号、日期等）
+    import re
+    is_pure_number = bool(re.match(r'^[\d\-\.\s\(\)]+$', stripped)) and stripped.replace('-', '').replace('.', '').replace(' ', '').replace('(', '').replace(')', '').isdigit()
+
+    # 如果文本不是长文本或是纯数字，且有历史记录，使用历史辅助判断
+    if (not _is_long_text(text) or is_pure_number) and history:
+        # 在历史记录中查找强语言的长文本
+        for hist_text in history:
+            if _is_long_text(hist_text):
+                hist_result, _ = _detect_single_with_confidence(hist_text)
+                if hist_result in STRONG_LANGUAGES:
+                    # 找到强语言，直接使用
+                    return hist_result
+
+    return result
