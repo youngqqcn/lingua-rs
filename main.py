@@ -1,4 +1,5 @@
 import csv
+import opencc
 from lingua import Language, LanguageDetectorBuilder
 
 # 创建语言检测器
@@ -24,30 +25,64 @@ LANG_NAME_MAP = {
     Language.SPANISH: "Spanish",
     Language.PORTUGUESE: "Portuguese",
     Language.INDONESIAN: "Indonesian",
+    Language.VIETNAMESE: "Vietnamese",
+    Language.RUSSIAN: "Russian",
+    Language.GERMAN: "German",
+    Language.FRENCH: "French",
+    Language.ITALIAN: "Italian",
 }
 
-# 繁体中文Unicode区间（用于区分简繁体）
-# 繁体中文常用字范围：CJK兼容表意文字 U+2F00-U+2FD5, U+3000-U+303F, U+3100-U+312F, U+3200-U+32FF
-TRADITIONAL_CHINESE_RANGES = [
-    (0x2F00, 0x2FD5),  # Kangxi Radicals
-    (0x3000, 0x303F),  # CJK Symbols and Punctuations (部分繁體有用)
-    (0x3100, 0x312F),  # Bopomofo (注音符号，繁体)
-    (0x3200, 0x32FF),  # Enclosed CJK Letters (部分繁体)
-    (0xF900, 0xFAFF),  # CJK Compatibility Ideographs (繁体兼容字)
-    (0x20000, 0x2A6DF),  # CJK Unified Ideographs Extension B-G (罕见繁体字)
-    (0x2A700, 0x2B73F),  # CJK Unified Ideographs Extension (罕见繁体字)
-    (0x2B740, 0x2B81F),  # CJK Unified Ideographs Extension (罕见繁体字)
-    (0x2B820, 0x2CEAF),  # CJK Unified Ideographs Extension (罕见繁体字)
-]
+# 创建OpenCC转换器
+s2t_converter = opencc.OpenCC('s2t')  # 简体转繁体
+t2s_converter = opencc.OpenCC('t2s')  # 繁体转简体
 
 def is_traditional_chinese(text):
-    """检测文本是否包含繁体中文"""
-    for char in text:
-        code = ord(char)
-        for start, end in TRADITIONAL_CHINESE_RANGES:
-            if start <= code <= end:
-                return True
-    return False
+    """使用OpenCC检测文本是简体中文还是繁体中文
+
+    原理：
+    - 简体文本经过 t2s(s2t(text)) 转换后基本不变（差异小）
+    - 繁体文本经过 s2t(t2s(text)) 转换后基本不变（差异小）
+
+    通过比较两个方向的转换差异来判断文本类型。
+    """
+    if not text or not text.strip():
+        return False
+
+    # 纯ASCII文本不是中文
+    if text.isascii():
+        return False
+
+    # 检查是否包含中文字符
+    has_chinese = any("\u4e00" <= c <= "\u9fff" for c in text)
+    if not has_chinese:
+        return False
+
+    # 简→繁→简
+    simplified_roundtrip = t2s_converter.convert(s2t_converter.convert(text))
+    # 繁→简→繁
+    traditional_roundtrip = s2t_converter.convert(t2s_converter.convert(text))
+
+    # 计算差异字符数
+    diff_s = sum(1 for a, b in zip(text, simplified_roundtrip) if a != b)
+    diff_t = sum(1 for a, b in zip(text, traditional_roundtrip) if a != b)
+
+    # 如果两个方向的差异都很大，可能是混合文本或单字符（如"哈哈哈"）
+    # 这种情况下，如果文本中有繁体Unicode特征字符，视为繁体
+    if abs(diff_s - diff_t) <= 1:
+        # 差异接近，检查Unicode特征
+        TRADITIONAL_RANGES = [
+            (0x3100, 0x312F),  # Bopomofo (注音符号，繁体)
+            (0xF900, 0xFAFF),  # CJK Compatibility Ideographs
+        ]
+        for char in text:
+            code = ord(char)
+            for start, end in TRADITIONAL_RANGES:
+                if start <= code <= end:
+                    return True
+        return False
+
+    # diff_s < diff_t 说明原文更接近简体
+    return diff_t < diff_s
 
 def detect_language(text):
     """使用lingua-py检测文本语言，返回英文语言名称"""
