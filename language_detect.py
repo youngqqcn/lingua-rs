@@ -222,12 +222,6 @@ def detect_language(text: str) -> str | None:
     if not text or not text.strip():
         return None
 
-    stripped = text.strip()
-
-    # ========== 前置过滤 ==========
-    if should_filter_short_text(stripped):
-        return None
-
     # ========== 语言检测 ==========
     text = normalize_text(text)
 
@@ -289,7 +283,7 @@ def detect_language(text: str) -> str | None:
                 return "Vietnamese"
 
             return detected
-        return "Unknown"
+        return "English"
     except Exception:
         has_cjk = any("\u4e00" <= c <= "\u9fff" for c in text)
         has_hiragana = any("\u3040" <= c <= "\u309f" for c in text)
@@ -314,4 +308,4 @@ def detect_language(text: str) -> str | None:
                 return "Chinese(Traditional)"
             return "Chinese(Simplified)"
 
-        return "Unknown"
+        return "English"
