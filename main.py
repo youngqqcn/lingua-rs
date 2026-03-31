@@ -1,7 +1,43 @@
 import csv
 import opencc
 from lingua import Language, LanguageDetectorBuilder
-from cantofilter.judge import find_canto_unique, LanguageType
+# 严格的粤语特征词表（避免误判）
+# 只包含明确的粤语常用词
+CANTONESE_FEATURES = [
+    '冇', '喺', '嘅', '噉', '咁', '哋', '乜', '點解', '幾時', '做咩',
+    '你哋', '佢', '佢哋', '我哋', '佢', '窿', '噉樣', '噉嘅', '係先',
+    '唔好', '唔知', '唔係', '理佢', '知唔知', '俾', '拗', '孭', '諗',
+    '攞', '掂', '姣', '簪', '晏', '癮', '甩', '甩', '至', '咁',
+    '係呀', '係啦', '唔該', '多謝', '早晨', '午安', '晚安',
+]
+
+def has_cantonese_features(text):
+    """严格检测文本是否包含明确的粤语特征词
+
+    使用自定义的粤语特征词表，避免 canto-filter 的误报问题。
+    特征词包括：冇、喺、嘅、噉、咁、哋、乜、點解、幾時、做咩、你哋、佢哋 等。
+    """
+    if not text or not text.strip():
+        return False
+
+    # 纯ASCII文本不是粤语
+    if text.isascii():
+        return False
+
+    # 检查是否包含中文字符
+    has_chinese = any("\u4e00" <= c <= "\u9fff" for c in text)
+    if not has_chinese:
+        return False
+
+    # 先将简体转为繁体再检测
+    traditional_text = s2t_converter.convert(text)
+
+    # 检查是否包含任何粤语特征词
+    for feature in CANTONESE_FEATURES:
+        if feature in traditional_text or feature in text:
+            return True
+
+    return False
 
 # 创建语言检测器
 languages = [
@@ -94,30 +130,8 @@ def is_traditional_chinese(text):
     return diff_t < diff_s
 
 def is_cantonese(text):
-    """使用canto-filter检测文本是否包含粤语特征
-
-    canto-filter使用正则表达式检测粤语特征字词，
-    输入应为繁体中文，因此先用OpenCC将简体转为繁体。
-    如果检测到CANTONESE或MIXED类型，返回True。
-    """
-    if not text or not text.strip():
-        return False
-
-    # 纯ASCII文本不是粤语
-    if text.isascii():
-        return False
-
-    # 检查是否包含中文字符
-    has_chinese = any("\u4e00" <= c <= "\u9fff" for c in text)
-    if not has_chinese:
-        return False
-
-    # canto-filter默认使用繁体中文
-    # 如果原文是简体，先转换为繁体
-    traditional_text = s2t_converter.convert(text)
-
-    # 使用canto-filter检测
-    return find_canto_unique(traditional_text)
+    """使用严格的粤语特征词表检测文本是否为粤语"""
+    return has_cantonese_features(text)
 
 def detect_language(text):
     """使用lingua-py检测文本语言，返回英文语言名称"""
