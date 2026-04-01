@@ -87,7 +87,7 @@ def has_cantonese_features(text: str) -> bool:
             return True
 
     # 高频单字特征（出现在>5%的粤语样本中，单独即可判定）
-    STRONG_CHAR_FEATURES = ['冇', '喺', '嘅', '哋', '咁', '咩', '咗']
+    STRONG_CHAR_FEATURES = ['冇', '喺', '嘅', '哋', '咁', '咩', '咗', '唔', '點', '搵', '睇', '俾', '攞']
     for feature in STRONG_CHAR_FEATURES:
         if feature in traditional_text or feature in text:
             return True
