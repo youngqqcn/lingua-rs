@@ -7,6 +7,22 @@
 import opencc
 
 # =============================================================================
+# 常量定义
+# =============================================================================
+
+# Emoji 和符号 Unicode 范围
+EMOJI_RANGES = [
+    (0x2600, 0x26FF),   # Miscellaneous Symbols
+    (0x2700, 0x27BF),   # Dingbats
+    (0x1F300, 0x1F9FF), # Miscellaneous Symbols and Pictographs
+    (0x1FA00, 0x1F6FF), # Various emoji
+]
+
+# 中文标点符号
+CHINESE_PUNCTUATION = set('！？。，：；、「」『』【】（）〈〉《》……——－·')
+
+
+# =============================================================================
 # 初始化
 # =============================================================================
 
@@ -49,6 +65,28 @@ def normalize_text(text: str) -> str:
 def has_chinese(text: str) -> bool:
     """检查是否包含汉字"""
     return any('\u4e00' <= c <= '\u9fff' for c in text)
+
+
+def _is_pure_punctuation_or_emoji(text: str) -> bool:
+    """检查文本是否为纯标点符号或emoji（无实际内容）"""
+    for char in text:
+        code = ord(char)
+        # 检查是否是emoji
+        is_emoji = any(start <= code <= end for start, end in EMOJI_RANGES)
+        if is_emoji:
+            continue
+        # 检查是否是中文标点
+        if char in CHINESE_PUNCTUATION:
+            continue
+        # 检查是否是ASCII标点
+        if char in '.,!?()[]{}":;\'/-_+=*&^%$#@~`':
+            continue
+        # 检查是否是空格/控制字符
+        if char.isspace() or ord(char) < 32:
+            continue
+        # 有其他字符，不是纯标点/emoji
+        return False
+    return True
 
 
 def has_cantonese_features(text: str) -> bool:
@@ -211,6 +249,10 @@ def detect_language(text: str, history: list[str] | None = None) -> str | None:
 
     # 非中文文本直接返回 None
     if stripped.isascii():
+        return None
+
+    # 纯标点符号或emoji返回 None
+    if _is_pure_punctuation_or_emoji(stripped):
         return None
 
     # 检查是否包含汉字
