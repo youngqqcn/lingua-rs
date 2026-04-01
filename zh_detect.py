@@ -166,11 +166,28 @@ def is_traditional_chinese(text: str) -> bool:
     return diff_s > diff_t
 
 
-def detect_language(text: str) -> str | None:
+def _is_long_chinese_text(text: str) -> bool:
+    """判断是否为长中文文本（参与历史统计）"""
+    chinese_count = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+    return chinese_count >= 5
+
+
+def _has_strong_chinese_signal(text: str) -> bool:
+    """判断文本是否有强中文信号（即使短文本也值得参考）"""
+    if has_cantonese_features(text):
+        return True
+    if is_traditional_chinese(text):
+        return True
+    return False
+
+
+def detect_language(text: str, history: list[str] | None = None) -> str | None:
     """检测文本语言（仅限中文简/繁/粤语）
 
     Args:
         text: 输入文本
+        history: 历史文本列表，用于辅助判断短文本的语言
+                例如用户连续对话中，短文本可能与之前的中文内容相关
 
     Returns:
         "Chinese(Simplified)", "Chinese(Traditional)", "Cantonese"
@@ -180,35 +197,46 @@ def detect_language(text: str) -> str | None:
         return None
 
     text = normalize_text(text)
+    stripped = text.strip()
+
+    # 短文本且有历史记录，尝试用历史辅助判断
+    if not _is_long_chinese_text(stripped) and history:
+        for hist_text in history:
+            hist_normalized = normalize_text(hist_text)
+            # 历史文本需要是长文本，或者有强中文信号
+            if _is_long_chinese_text(hist_normalized) or _has_strong_chinese_signal(hist_normalized):
+                hist_result = detect_language(hist_text, None)
+                if hist_result in ('Chinese(Simplified)', 'Chinese(Traditional)', 'Cantonese'):
+                    return hist_result
 
     # 非中文文本直接返回 None
-    if text.isascii():
+    if stripped.isascii():
         return None
 
     # 检查是否包含汉字
-    if not has_chinese(text):
+    if not has_chinese(stripped):
         return None
 
     # 如果包含其他语言字符（非中文），直接返回 None
     # 日语假名
-    if any('\u3040' <= c <= '\u309f' or '\u30a0' <= c <= '\u30ff' for c in text):
+    if any('\u3040' <= c <= '\u309f' or '\u30a0' <= c <= '\u30ff' for c in stripped):
         return None
     # 韩语
-    if any('\uac00' <= c <= '\ud7af' for c in text):
+    if any('\uac00' <= c <= '\ud7af' for c in stripped):
         return None
     # 俄语/西里尔字母
-    if any('\u0400' <= c <= '\u04ff' for c in text):
+    if any('\u0400' <= c <= '\u04ff' for c in stripped):
         return None
     # 越南语特有字符
-    if any(c in 'ăâđêôơư' for c in text):
+    if any(c in 'ăâđêôơư' for c in stripped):
         return None
 
     # 检测粤语
-    if has_cantonese_features(text):
+    if has_cantonese_features(stripped):
         return "Cantonese"
 
     # 检测繁体/简体
-    if is_traditional_chinese(text):
+    if is_traditional_chinese(stripped):
         return "Chinese(Traditional)"
 
     return "Chinese(Simplified)"
