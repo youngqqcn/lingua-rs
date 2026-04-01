@@ -219,6 +219,18 @@ def _has_strong_chinese_signal(text: str) -> bool:
     return False
 
 
+def _is_valid_history_text(text: str) -> bool:
+    """判断文本是否可作为有效历史参考"""
+    if _is_long_chinese_text(text):
+        return True
+    if _has_strong_chinese_signal(text):
+        return True
+    # 普通中文文本（至少有汉字）
+    if has_chinese(text):
+        return True
+    return False
+
+
 def detect_language(text: str, history: list[str] | None = None) -> str | None:
     """检测文本语言（仅限中文简/繁/粤语）
 
@@ -237,23 +249,36 @@ def detect_language(text: str, history: list[str] | None = None) -> str | None:
     text = normalize_text(text)
     stripped = text.strip()
 
+    # ASCII文本：尝试用历史辅助判断
+    if stripped.isascii():
+        if history:
+            for hist_text in history:
+                hist_normalized = normalize_text(hist_text)
+                if _is_valid_history_text(hist_normalized):
+                    hist_result = detect_language(hist_text, None)
+                    if hist_result in ('Chinese(Simplified)', 'Chinese(Traditional)', 'Cantonese'):
+                        return hist_result
+        return None
+
+    # 纯标点符号或emoji：尝试用历史辅助判断
+    if _is_pure_punctuation_or_emoji(stripped):
+        if history:
+            for hist_text in history:
+                hist_normalized = normalize_text(hist_text)
+                if _is_valid_history_text(hist_normalized):
+                    hist_result = detect_language(hist_text, None)
+                    if hist_result in ('Chinese(Simplified)', 'Chinese(Traditional)', 'Cantonese'):
+                        return hist_result
+        return None
+
     # 短文本且有历史记录，尝试用历史辅助判断
     if not _is_long_chinese_text(stripped) and history:
         for hist_text in history:
             hist_normalized = normalize_text(hist_text)
-            # 历史文本需要是长文本，或者有强中文信号
-            if _is_long_chinese_text(hist_normalized) or _has_strong_chinese_signal(hist_normalized):
+            if _is_valid_history_text(hist_normalized):
                 hist_result = detect_language(hist_text, None)
                 if hist_result in ('Chinese(Simplified)', 'Chinese(Traditional)', 'Cantonese'):
                     return hist_result
-
-    # 非中文文本直接返回 None
-    if stripped.isascii():
-        return None
-
-    # 纯标点符号或emoji返回 None
-    if _is_pure_punctuation_or_emoji(stripped):
-        return None
 
     # 检查是否包含汉字
     if not has_chinese(stripped):
