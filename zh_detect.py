@@ -67,9 +67,11 @@ def has_cantonese_features(text: str) -> bool:
     """严格检测文本是否包含明确的粤语特征词
 
     判定规则：
-    - 任意一个强特征字（'冇', '喺', '嘅', '哋', '咁', '咩', '咗'）OR
     - 任意一个词组级特征 OR
+    - 任意一个高频单字特征 OR
     - 2个或以上其他单字特征
+
+    重要：对于可能在简繁转换中混淆的字符（如點/点），只检查原文
     """
     if not text or not text.strip():
         return False
@@ -77,30 +79,39 @@ def has_cantonese_features(text: str) -> bool:
         return False
     if not has_chinese(text):
         return False
-    # 转换为繁体后检查（粤语特征在繁体中更明显）
-    traditional_text = s2t_converter.convert(text)
 
-    # 词组级特征（优先级高，任意一个即判定为粤语）
-    PHRASE_FEATURES = ['點解', '邊度', '做咩', '係咪', '係唔係', '唔該', '多謝', '真係', '你哋', '佢哋', '我哋', '搶飛', '買飛']
+    # 检查原文是否包含简体特有的"点"（不是繁体"點"）
+    has_simplified_dian = '点' in text
+
+    # 词组级特征（任意一个即判定为粤语）
+    PHRASE_FEATURES = ['點解', '邊度', '做咩', '係咪', '係唔係', '唔該', '多謝', '真係', '你哋', '佢哋', '我哋', '搶飛', '買飛', '點樣', '點算']
     for feature in PHRASE_FEATURES:
-        if feature in traditional_text or feature in text:
+        if feature in text:
             return True
 
-    # 高频单字特征（出现在>5%的粤语样本中，单独即可判定）
-    STRONG_CHAR_FEATURES = ['冇', '喺', '嘅', '哋', '咁', '咩', '咗', '唔', '點', '搵', '睇', '俾', '攞']
+    # 高频单字特征（出现在>10%的粤语样本中）
+    # 这些字在简繁中含义不同，不会因转换混淆
+    # 任意一个即可判定为粤语
+    STRONG_CHAR_FEATURES = ['冇', '喺', '嘅', '哋', '咁', '咗', '唔', '睇', '俾', '攞']
     for feature in STRONG_CHAR_FEATURES:
-        if feature in traditional_text or feature in text:
+        if feature in text:
             return True
 
     # 其他单字级特征（需要至少2个才判定为粤语）
-    CHAR_FEATURES = ['乜', '噉', '吖', '喔', '咯', '噃', '咋', '啫', '啩', '嘞', '啰', '喇', '咖', '嘎', '㗎']
+    CHAR_FEATURES = ['乜', '噉', '吖', '喔', '咯', '噃', '咋', '啫', '啩', '嘞', '啰', '喇', '咖', '嘎', '㗎', '咩']
+
+    # 如果原文包含"点"（简体形式），不检查基于"點"的特征
+    # 这样可以避免简转繁产生的误判
+    if has_simplified_dian:
+        return False
 
     char_count = 0
     for feature in CHAR_FEATURES:
-        if feature in traditional_text or feature in text:
+        if feature in text:
             char_count += 1
-            if char_count >= 2:  # 至少2个其他单字特征
+            if char_count >= 2:
                 return True
+
     return False
 
 
