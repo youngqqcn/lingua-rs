@@ -34,7 +34,7 @@ keywords = [
 ]
 
 [workspace]
-members = ["language-models/id", "language-models/ms", "language-models/pt", "language-models/es"]
+members = ["language-models/en", "language-models/id", "language-models/ms", "language-models/pt", "language-models/es"]
 
 [workspace.package]
 version = "1.3.0"
@@ -79,7 +79,8 @@ regex = "1.12.2"
 serde = { version = "1.0.228", features = ["derive"] }
 strum = "0.27.2"
 strum_macros = "0.27.2"
-# Only keep 4 languages: Malay, Spanish, Portuguese, Indonesian
+# Keep 5 languages: English, Malay, Spanish, Portuguese, Indonesian
+lingua-english-language-model = { path = "language-models/en", version = "1.3.0", optional = true }
 lingua-indonesian-language-model = { path = "language-models/id", version = "1.3.0", optional = true }
 lingua-malay-language-model = { path = "language-models/ms", version = "1.3.0", optional = true }
 lingua-portuguese-language-model = { path = "language-models/pt", version = "1.3.0", optional = true }
@@ -117,11 +118,12 @@ criterion = "0.8.1"
 wasm-bindgen-test = "0.3.56"
 
 [features]
-# Only 4 languages: Malay, Spanish, Portuguese, Indonesian
-default = ["indonesian", "malay", "portuguese", "spanish"]
+# Keep 5 languages: English, Malay, Spanish, Portuguese, Indonesian
+default = ["english", "indonesian", "malay", "portuguese", "spanish"]
 accuracy-reports = ["clap", "cld2", "indoc", "polars", "titlecase", "whatlang", "whichlang"]
 benchmark = ["cld2", "whatlang", "whichlang"]
 python = ["pyo3", "serde-pickle"]
+english = ["lingua-english-language-model"]
 indonesian = ["lingua-indonesian-language-model"]
 malay = ["lingua-malay-language-model"]
 portuguese = ["lingua-portuguese-language-model"]
