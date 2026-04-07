@@ -9,7 +9,7 @@ wheels/
 # Virtual environments
 .venv
 
-# External libraries (managed separately via pip)
+# External libraries (managed separately)
 lingua-rs/
 lingua-py/
 
