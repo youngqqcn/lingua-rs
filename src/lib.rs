@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#![allow(unexpected_cfgs)]
 //! ## 1. What does this library do?
 //!
 //! Its task is simple: It tells you which language some text is written in.
