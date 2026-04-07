@@ -17,7 +17,7 @@
 name = "lingua-language-detector"
 version = "2.3.0"
 authors = [{ name = "yqq", email = "yqq@yqq.cn" }]
-description = "A slimmed-down language detection library - only Malay, Spanish, Portuguese, Indonesian. Other languages use Unicode detection."
+description = "A slimmed-down language detection library - only English, Malay, Spanish, Portuguese, Indonesian. Other languages use Unicode detection."
 readme = "README_PYPI.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
@@ -30,6 +30,7 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
+    "Natural Language :: English",
     "Natural Language :: Indonesian",
     "Natural Language :: Malay",
     "Natural Language :: Portuguese",
