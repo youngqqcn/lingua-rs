@@ -9,5 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
+# External libraries (managed separately via pip)
+lingua-rs/
+lingua-py/
 
 *.csv
