@@ -7,6 +7,22 @@
 import opencc
 
 # =============================================================================
+# 常量定义
+# =============================================================================
+
+# Emoji 和符号 Unicode 范围
+EMOJI_RANGES = [
+    (0x2600, 0x26FF),   # Miscellaneous Symbols
+    (0x2700, 0x27BF),   # Dingbats
+    (0x1F300, 0x1F9FF), # Miscellaneous Symbols and Pictographs
+    (0x1FA00, 0x1F6FF), # Various emoji
+]
+
+# 中文标点符号
+CHINESE_PUNCTUATION = set('！？。，：；、「」『』【】（）〈〉《》……——－·')
+
+
+# =============================================================================
 # 初始化
 # =============================================================================
 
@@ -49,6 +65,28 @@ def normalize_text(text: str) -> str:
 def has_chinese(text: str) -> bool:
     """检查是否包含汉字"""
     return any('\u4e00' <= c <= '\u9fff' for c in text)
+
+
+def _is_pure_punctuation_or_emoji(text: str) -> bool:
+    """检查文本是否为纯标点符号或emoji（无实际内容）"""
+    for char in text:
+        code = ord(char)
+        # 检查是否是emoji
+        is_emoji = any(start <= code <= end for start, end in EMOJI_RANGES)
+        if is_emoji:
+            continue
+        # 检查是否是中文标点
+        if char in CHINESE_PUNCTUATION:
+            continue
+        # 检查是否是ASCII标点
+        if char in '.,!?()[]{}":;\'/-_+=*&^%$#@~`':
+            continue
+        # 检查是否是空格/控制字符
+        if char.isspace() or ord(char) < 32:
+            continue
+        # 有其他字符，不是纯标点/emoji
+        return False
+    return True
 
 
 def has_cantonese_features(text: str) -> bool:
@@ -127,7 +165,7 @@ def is_traditional_chinese(text: str) -> bool:
     diff_s = sum(1 for i in range(len(text)) if (i >= len(to_simplified) or text[i] != to_simplified[i]))
     diff_t = sum(1 for i in range(len(text)) if (i >= len(to_traditional) or text[i] != to_traditional[i]))
 
-    TRADITIONAL_SPECIFIC = set('絡網價過錢預賬戶郵寄詐騙時間麼轉賣買飛會丟並亞佇佈佔併來係倉個們倫側偵偽傑傘備傳傷僅價儘償優儲兌兒內兩冊凍別刪則剛創剷劃劍動務勢匯區協卻厭參員唄問啟喎單嗎嗰嘗嘩囉國圍圖團報場墮夠夢夾媽嬌學實審寫寵寶將專尋對導層屬峯帥帳帶幣幫幹幾庫廈廢廣廳張強彈後徑從復恆惡愛態慘慮憑應懷戶掃掛採揀換損搖搵搶撐撳擁擇擊擋擔據擠擬擺攜攤攪攬敗數斃斷於時暫書會東條棄業極榮構樂樑樓標樣機檔檢檯檻櫃欄權歐歡歲歸毀氈氣決沒沖況洩淚淨減測準溝溫滅滙滾漢漣潰濤濫瀏灘灣為無煩熱燈爛爾牆狀猶獅獎獨獲現環產畢畫異當發盜盡盤盧眾瞞確碼礙禮種稱穩筆節範簡簽籌籬紀約紅納純紙級細終結絡給統絲綁經綜線維網綴綵緊線編練縮總繫繳繼續罵習聖聯職聽脫腦腳膽臉臨臺與舉舊華萬蓋薦藍藝蘇處虛號螞蟻術衛衝裡補裝裡製複見規視親覺覽觀訂計訊託記')
+    TRADITIONAL_SPECIFIC = set('絡網價過錢預賬戶郵詐騙時間麼轉賣買飛會丟並亞佇佈佔併來係倉個們倫側偵偽傑傘備傳傷僅價儘償優儲兌兒內兩冊凍別刪則剛創剷劃劍動務勢匯區協卻厭參員唄問啟喎單嗎嗰嘗嘩囉國圍圖團報場墮夠夢夾媽嬌學實審寫寵寶將專尋對導層屬峯帥帳帶幣幫幹幾庫廈廢廣廳張強彈後徑從復恆惡愛態慘慮憑應懷戶掃掛採揀換損搖搵搶撐撳擁擇擊擋擔據擠擬擺攜攤攪攬敗數斃斷於時暫書會東條棄業極榮構樂樑樓標樣機檔檢檯檻櫃欄權歐歡歲歸毀氈氣決沒沖況洩淚淨減測準溝溫滅滙滾漢漣潰濤濫瀏灘灣為無煩熱燈爛爾牆狀猶獅獎獨獲現環產畢畫異當發盜盡盤盧眾瞞確碼礙禮種稱穩筆節範簡簽籌籬紀約紅納純紙級細終結絡給統絲綁經綜線維網綴綵緊線編練縮總繫繳繼續罵習聖聯職聽脫腦腳膽臉臨臺與舉舊華萬蓋薦藍藝蘇處虛號螞蟻術衛衝裡補裝裡製複見規視親覺覽觀訂計訊託記')
 
     # 如果差异都很小，检查是否包含繁体特有字符
     if diff_s == 0 and diff_t == 0:
@@ -166,14 +204,31 @@ def is_traditional_chinese(text: str) -> bool:
     return diff_s > diff_t
 
 
-def _has_chinese_content(text: str) -> bool:
-    """判断文本是否包含中文内容"""
-    return has_chinese(text)
+def _is_long_chinese_text(text: str) -> bool:
+    """判断是否为长中文文本（参与历史统计）"""
+    chinese_count = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+    return chinese_count >= 5
 
 
-def _is_valid_history_for_chinese(text: str) -> bool:
-    """判断历史文本是否可用于中文参考"""
-    return has_chinese(text)
+def _has_strong_chinese_signal(text: str) -> bool:
+    """判断文本是否有强中文信号（即使短文本也值得参考）"""
+    if has_cantonese_features(text):
+        return True
+    if is_traditional_chinese(text):
+        return True
+    return False
+
+
+def _is_valid_history_text(text: str) -> bool:
+    """判断文本是否可作为有效历史参考"""
+    if _is_long_chinese_text(text):
+        return True
+    if _has_strong_chinese_signal(text):
+        return True
+    # 普通中文文本（至少有汉字）
+    if has_chinese(text):
+        return True
+    return False
 
 
 def detect_language(text: str, history: list[str] | None = None) -> str | None:
@@ -182,6 +237,7 @@ def detect_language(text: str, history: list[str] | None = None) -> str | None:
     Args:
         text: 输入文本
         history: 历史文本列表，用于辅助判断短文本的语言
+                例如用户连续对话中，短文本可能与之前的中文内容相关
 
     Returns:
         "Chinese(Simplified)", "Chinese(Traditional)", "Cantonese"
@@ -193,28 +249,61 @@ def detect_language(text: str, history: list[str] | None = None) -> str | None:
     text = normalize_text(text)
     stripped = text.strip()
 
-    # 非ASCII文本：检查是否包含中文
-    if not stripped.isascii() and _has_chinese_content(stripped):
-        # 检测粤语
-        if has_cantonese_features(stripped):
-            return "Cantonese"
+    # ASCII文本：尝试用历史辅助判断
+    if stripped.isascii():
+        if history:
+            for hist_text in history:
+                hist_normalized = normalize_text(hist_text)
+                if _is_valid_history_text(hist_normalized):
+                    hist_result = detect_language(hist_text, None)
+                    if hist_result in ('Chinese(Simplified)', 'Chinese(Traditional)', 'Cantonese'):
+                        return hist_result
+        return None
 
-        # 检测繁体/简体
-        if is_traditional_chinese(stripped):
-            return "Chinese(Traditional)"
+    # 纯标点符号或emoji：尝试用历史辅助判断
+    if _is_pure_punctuation_or_emoji(stripped):
+        if history:
+            for hist_text in history:
+                hist_normalized = normalize_text(hist_text)
+                if _is_valid_history_text(hist_normalized):
+                    hist_result = detect_language(hist_text, None)
+                    if hist_result in ('Chinese(Simplified)', 'Chinese(Traditional)', 'Cantonese'):
+                        return hist_result
+        return None
 
-        return "Chinese(Simplified)"
-
-    # ASCII文本或纯标点/Emoji：尝试用历史辅助判断
-    if history:
+    # 短文本且有历史记录，尝试用历史辅助判断
+    if not _is_long_chinese_text(stripped) and history:
         for hist_text in history:
-            if _is_valid_history_for_chinese(hist_text):
-                # 递归检测历史文本
+            hist_normalized = normalize_text(hist_text)
+            if _is_valid_history_text(hist_normalized):
                 hist_result = detect_language(hist_text, None)
                 if hist_result in ('Chinese(Simplified)', 'Chinese(Traditional)', 'Cantonese'):
                     return hist_result
-                # 如果历史是中文但无法确定类型，优先返回繁体
-                if _has_chinese_content(hist_text):
-                    return "Chinese(Traditional)"
 
-    return None
+    # 检查是否包含汉字
+    if not has_chinese(stripped):
+        return None
+
+    # 如果包含其他语言字符（非中文），直接返回 None
+    # 日语假名
+    if any('\u3040' <= c <= '\u309f' or '\u30a0' <= c <= '\u30ff' for c in stripped):
+        return None
+    # 韩语
+    if any('\uac00' <= c <= '\ud7af' for c in stripped):
+        return None
+    # 俄语/西里尔字母
+    if any('\u0400' <= c <= '\u04ff' for c in stripped):
+        return None
+    # 越南语特有字符
+    if any(c in 'ăâđêôơư' for c in stripped):
+        return None
+
+    # 检测粤语
+    if has_cantonese_features(stripped):
+        return "Cantonese"
+
+    # 检测繁体/简体
+    if is_traditional_chinese(stripped):
+        return "Chinese(Traditional)"
+
+    return "Chinese(Simplified)"
