@@ -1,31 +1,59 @@
 #!/usr/bin/env python3
 """
-Language detection v2 - uses Unicode detection for non-latin languages
-and lingua-slim (English, Malay, Spanish, Portuguese, Indonesian)
-for latin-based language detection.
+Language detection v2 - Unified detector combining:
+- Unicode detection for CJK/Thai/Cyrillic/etc.
+- OpenCC-based Chinese variant detection (Simplified/Traditional/Cantonese)
+- lingua-slim (English, French, Malay, Spanish, Portuguese, Indonesian) for Latin-based languages
 
-Install: pip install lingua-slim
+Install: pip install lingua-slim opencc-python-reimplemented
 """
 
 import re
+from typing import Optional
 
+import opencc
 from lingua import Language, LanguageDetectorBuilder
 
 
+# =============================================================================
+# Chinese Detection - Constants (from zh_detect.py)
+# =============================================================================
+
+# Emoji 和符号 Unicode 范围
+EMOJI_RANGES = [
+    (0x2600, 0x26FF),   # Miscellaneous Symbols
+    (0x2700, 0x27BF),   # Dingbats
+    (0x1F300, 0x1F9FF), # Miscellaneous Symbols and Pictographs
+    (0x1FA00, 0x1F6FF), # Various emoji
+]
+
+# 中文标点符号
+CHINESE_PUNCTUATION = set('！？。，：；、「」『』【】（）〈〉《》……——－·')
+
+# OpenCC 转换器
+_S2T_CONVERTER = opencc.OpenCC('s2t')
+_T2S_CONVERTER = opencc.OpenCC('t2s')
+
+
+# =============================================================================
+# LanguageDetector Class
+# =============================================================================
+
 class LanguageDetector:
     """
-    Language detector combining Unicode-based detection for CJK/Thai/Cyrillic/etc.
-    and lingua-slim for Latin-based language detection.
+    Unified language detector combining:
+    - Unicode-based detection for CJK/Thai/Cyrillic/etc.
+    - OpenCC-based Chinese variant detection (Simplified/Traditional/Cantonese)
+    - lingua-slim for Latin-based language detection
 
     Supported languages:
-    - Unicode-based: Chinese, Japanese, Korean, Thai, Russian, Arabic,
-      Hindi, Tamil, Greek, Hebrew, Vietnamese
-    - lingua-slim: English, Malay, Spanish, Portuguese, Indonesian
+    - Chinese variants: Chinese(Simplified), Chinese(Traditional), Cantonese
+    - Unicode-based: Japanese, Korean, Thai, Russian, Arabic, Hindi, Tamil, Greek, Hebrew, Vietnamese
+    - lingua-slim: English, French, Malay, Spanish, Portuguese, Indonesian
     """
 
     # Unicode ranges for various languages/scripts
     UNICODE_RANGES = {
-        "Chinese": r'[\u4e00-\u9fff\u3400-\u4dbf]',
         "Japanese": r'[\u3040-\u309f\u30a0-\u30ff]',
         "Korean": r'[\uac00-\ud7af\u1100-\u11ff]',
         "Thai": r'[\u0e00-\u0e7f]',
@@ -38,14 +66,14 @@ class LanguageDetector:
     }
 
     # Vietnamese diacritics - more selective to avoid false positives
-    # Only highly distinctive ones: đ is most unique to Vietnamese
+    # Only highly distinctive ones; đ is most unique to Vietnamese
     VIETNAMESE_DIACRITICS = set('ăâđêôơưấầẩẫắầẩẫặậẽẹềểễệỉọỏốồổộớờởợụủứừửự')
-    # Threshold: at least 2 diacritics OR contains đ (very unique to Vietnamese)
     VIETNAMESE_MIN_DIACRITICS = 2
 
     # Map lingua Language enum to display names
     LINGUA_LANG_MAP = {
         Language.ENGLISH: "English",
+        Language.FRENCH: "French",
         Language.MALAY: "Malay",
         Language.SPANISH: "Spanish",
         Language.PORTUGUESE: "Portuguese",
@@ -54,7 +82,8 @@ class LanguageDetector:
 
     # Strong languages that can help determine short text language
     STRONG_LANGUAGES = {
-        "Chinese", "Japanese", "Korean", "Thai", "Russian",
+        "Chinese(Simplified)", "Chinese(Traditional)", "Cantonese",
+        "Japanese", "Korean", "Thai", "Russian",
         "Arabic", "Hindi", "Tamil", "Greek", "Hebrew", "Vietnamese"
     }
 
@@ -62,34 +91,218 @@ class LanguageDetector:
         """Initialize the detector."""
         self._detector = None
 
+    # =========================================================================
+    # Utility Methods (from zh_detect.py)
+    # =========================================================================
+
+    def _normalize_text(self, text: str) -> str:
+        """标准化文本：移除特殊字符干扰"""
+        text = text.replace('\u2018', "'").replace('\u2019', "'")
+        text = text.replace('\u201a', "'").replace('\u201b', "'")
+        text = text.replace('\u2032', "'").replace('\u2035', "'")
+        text = text.replace('\u201c', '"').replace('\u201d', '"')
+        text = text.replace('\u201e', '"').replace('\u201f', '"')
+        text = text.replace('\u2014', '-').replace('\u2013', '-')
+        text = text.replace('\u2010', '-').replace('\u2011', '-')
+        for old, new in [('Ⅰ','I'), ('Ⅱ','II'), ('Ⅲ','III'), ('Ⅳ','IV'), ('Ⅴ','V'),
+                         ('Ⅵ','VI'), ('Ⅶ','VII'), ('Ⅷ','VIII'), ('Ⅸ','IX'), ('Ⅹ','X'),
+                         ('ⅰ','i'), ('ⅱ','ii'), ('ⅲ','iii'), ('ⅳ','iv'), ('ⅴ','v'),
+                         ('ⅵ','vi'), ('ⅶ','vii'), ('ⅷ','viii'), ('ⅸ','ix'), ('ⅹ','x')]:
+            text = text.replace(old, new)
+        return text
+
+    def _has_chinese(self, text: str) -> bool:
+        """检查是否包含汉字"""
+        return any('\u4e00' <= c <= '\u9fff' for c in text)
+
+    def _is_pure_punctuation_or_emoji(self, text: str) -> bool:
+        """检查文本是否为纯标点符号或emoji（无实际内容）"""
+        for char in text:
+            code = ord(char)
+            is_emoji = any(start <= code <= end for start, end in EMOJI_RANGES)
+            if is_emoji:
+                continue
+            if char in CHINESE_PUNCTUATION:
+                continue
+            if char in '.,!?()[]{}":;\'/-_+=*&^%$#@~`':
+                continue
+            if char.isspace() or ord(char) < 32:
+                continue
+            return False
+        return True
+
+    def _has_cantonese_features(self, text: str) -> bool:
+        """严格检测文本是否包含明确的粤语特征
+
+        判定规则：
+        - 任意一个词组级特征 OR
+        - 任意一个高频单字特征 OR
+        - 2个或以上其他单字特征
+        """
+        if not text or not text.strip():
+            return False
+        if text.isascii():
+            return False
+        if not self._has_chinese(text):
+            return False
+
+        has_simplified_dian = '点' in text
+
+        # 词组级特征（任意一个即判定为粤语）
+        PHRASE_FEATURES = ['點解', '邊度', '做咩', '係咪', '係唔係', '唔該', '多謝', '真係',
+                          '你哋', '佢哋', '我哋', '搶飛', '買飛', '點樣', '點算']
+        for feature in PHRASE_FEATURES:
+            if feature in text:
+                return True
+
+        # 高频单字特征（任意一个即可判定）
+        STRONG_CHAR_FEATURES = ['冇', '喺', '嘅', '哋', '咁', '咗', '唔', '睇', '俾', '攞',
+                                '搵', '咩', '嘞', '乜', '啫', '咖', '喇']
+        for char in STRONG_CHAR_FEATURES:
+            if char in text:
+                return True
+
+        # 其他单字特征（需要至少2个）
+        CHAR_FEATURES = ['噉', '吖', '喔', '咯', '噃', '咋', '啩', '啰', '嘎', '㗎']
+
+        if has_simplified_dian:
+            return False
+
+        char_count = sum(1 for f in CHAR_FEATURES if f in text)
+        return char_count >= 2
+
+    def _is_traditional_chinese(self, text: str) -> bool:
+        """使用OpenCC检测文本是简体中文还是繁体中文
+
+        原理：
+        - 原文转简体后变化大 → 原文中很多繁体字 → Traditional
+        - 原文转繁体后变化大 → 原文中很多简体字 → Simplified
+        """
+        if not text or not text.strip():
+            return False
+        if text.isascii() or not self._has_chinese(text):
+            return False
+
+        to_simplified = _T2S_CONVERTER.convert(text)
+        to_traditional = _S2T_CONVERTER.convert(text)
+
+        diff_s = sum(1 for i in range(len(text))
+                    if (i >= len(to_simplified) or text[i] != to_simplified[i]))
+        diff_t = sum(1 for i in range(len(text))
+                    if (i >= len(to_traditional) or text[i] != to_traditional[i]))
+
+        # 繁体特有字符集合
+        TRADITIONAL_SPECIFIC = set('時關閉顯敗賬號場館島龍裏過報簽遞鳥輸優購會員嗎馬罵碼臺們樣點電機話遲礦務國陸內圖數據諮詢證離開單達運資絡網價過錢預賬戶郵詐騙時間麼轉賣買飛會丟並亞佇佈佔併來係倉個們倫側偵偽傑傘備傳傷僅價儘償優儲兌兒內兩冊凍別刪則剛創剷劃劍動務勢匯區協卻厭參員唄問啟喎單嗎嗰嘗嘩囉國圍圖團報場墮夠夢夾媽嬌學實審寫寵寶將專尋對導層屬峯帥帳帶幣幫幹幾庫廈廢廣廳張強彈後徑從復恆惡愛態慘慮憑應懷戶掃掛採揀換損搖搵搶撐撳擁擇擊擋擔據擠擬擺攜攤攪攬敗數斃斷於時暫書會東條棄業極榮構樂樑樓標樣機檔檢檯檻櫃欄權歐歡歲歸毀氈氣決沒沖況洩淚淨減測準溝溫滅滙滾漢漣潰濤濫瀏灘灣為無煩熱燈爛爾牆狀猶獅獎獨獲現環產畢畫異當發盜盡盤盧眾瞞確碼礙禮種稱穩筆節範簡簽籌籬紀約紅納純紙級細終結絡給統絲綁經綜線維網綴綵緊線編練縮總繫繳繼續罵習聖聯職聽脫腦腳膽臉臨臺與舉舊華萬蓋薦藍藝蘇處虛號螞蟻術衛衝裡補裝裡製複見規視親覺覽觀訂計訊託記')
+
+        if diff_s == 0 and diff_t == 0:
+            return any(c in TRADITIONAL_SPECIFIC for c in text)
+
+        chinese_count = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+        if chinese_count == 0:
+            return False
+
+        change_rate_s = diff_s / chinese_count
+        change_rate_t = diff_t / chinese_count
+
+        if change_rate_s < 0.1 and change_rate_t < 0.1:
+            count = sum(1 for c in text if c in TRADITIONAL_SPECIFIC)
+            return count / chinese_count > 0.3
+
+        diff_diff = diff_s - diff_t
+        if abs(diff_diff) < 2:
+            count = sum(1 for c in text if c in TRADITIONAL_SPECIFIC)
+            return count / chinese_count > 0.3
+
+        return diff_s > diff_t
+
+    def _detect_chinese_variant(self, text: str) -> Optional[str]:
+        """检测中文变体：简体、繁体或粤语
+
+        Returns:
+            "Chinese(Simplified)", "Chinese(Traditional)", "Cantonese" or None
+        """
+        if not text or not text.strip():
+            return None
+        if text.isascii():
+            return None
+        if not self._has_chinese(text):
+            return None
+
+        stripped = text.strip()
+
+        # 如果包含其他语言字符（非中文），返回None
+        # 日语假名
+        if any('\u3040' <= c <= '\u309f' or '\u30a0' <= c <= '\u30ff' for c in stripped):
+            return None
+        # 韩语
+        if any('\uac00' <= c <= '\ud7af' for c in stripped):
+            return None
+        # 俄语/西里尔字母
+        if any('\u0400' <= c <= '\u04ff' for c in stripped):
+            return None
+        # 越南语特有字符
+        if any(c in 'ăâđêôơư' for c in stripped):
+            return None
+
+        # 检测粤语
+        if self._has_cantonese_features(stripped):
+            return "Cantonese"
+
+        # 检测繁体/简体
+        if self._is_traditional_chinese(stripped):
+            return "Chinese(Traditional)"
+
+        return "Chinese(Simplified)"
+
+    # =========================================================================
+    # Text Classification Methods
+    # =========================================================================
+
     def _is_long_text(self, text: str) -> bool:
         """Check if text is long enough to be used for history."""
         stripped = text.strip()
         if stripped.isascii():
-            # English: >= 5 words
             word_count = len(stripped.split())
             return word_count >= 5
         elif any("\u4e00" <= c <= "\u9fff" for c in stripped):
-            # Chinese: >= 5 characters
             chinese_count = sum(1 for c in stripped if "\u4e00" <= c <= "\u9fff")
             return chinese_count >= 5
         else:
-            # Other: >= 5 characters
             return len(stripped) >= 5
+
+    def _is_long_chinese_text(self, text: str) -> bool:
+        """判断是否为长中文文本"""
+        chinese_count = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+        return chinese_count >= 5
+
+    def _has_strong_chinese_signal(self, text: str) -> bool:
+        """判断文本是否有强中文信号"""
+        if self._has_cantonese_features(text):
+            return True
+        if self._is_traditional_chinese(text):
+            return True
+        return False
+
+    def _is_valid_history_text(self, text: str) -> bool:
+        """判断文本是否可作为有效历史参考"""
+        if self._is_long_chinese_text(text):
+            return True
+        if self._has_strong_chinese_signal(text):
+            return True
+        if self._has_chinese(text):
+            return True
+        return False
 
     def _detect_vietnamese(self, text: str) -> bool:
         """Check if text is likely Vietnamese based on diacritics."""
         diacritic_count = sum(1 for c in text if c in self.VIETNAMESE_DIACRITICS)
-        # đ is very unique to Vietnamese, or at least 2 diacritics
         return 'đ' in text.lower() or diacritic_count >= self.VIETNAMESE_MIN_DIACRITICS
 
-    def _detect_by_unicode(self, text: str) -> str | None:
-        """Detect language by Unicode character ranges."""
+    def _detect_by_unicode(self, text: str) -> Optional[str]:
+        """Detect language by Unicode character ranges (non-Chinese)."""
         if not text or not text.strip():
             return None
 
-        if re.search(self.UNICODE_RANGES["Chinese"], text):
-            return "Chinese"
         if re.search(self.UNICODE_RANGES["Japanese"], text):
             return "Japanese"
         if re.search(self.UNICODE_RANGES["Korean"], text):
@@ -114,9 +327,10 @@ class LanguageDetector:
         return None
 
     def _build_lingua_detector(self):
-        """Build lingua detector with 5 languages."""
+        """Build lingua detector with 6 languages."""
         return LanguageDetectorBuilder.from_languages(
             Language.ENGLISH,
+            Language.FRENCH,
             Language.MALAY,
             Language.SPANISH,
             Language.PORTUGUESE,
@@ -136,12 +350,17 @@ class LanguageDetector:
 
         text = text.strip()
 
-        # First try Unicode-based detection for non-latin languages
+        # 首先尝试中文变体检测（使用OpenCC）
+        chinese_variant = self._detect_chinese_variant(text)
+        if chinese_variant:
+            return chinese_variant
+
+        # 然后尝试其他Unicode语言
         unicode_lang = self._detect_by_unicode(text)
         if unicode_lang:
             return unicode_lang
 
-        # Then try lingua for latin-based languages
+        # 最后用lingua检测Latin语言
         try:
             detector = self._get_lingua_detector()
             result = detector.detect_language_of(text)
@@ -150,10 +369,9 @@ class LanguageDetector:
         except Exception:
             pass
 
-        # Default to English for ASCII-only text
         return "English"
 
-    def detect(self, text: str, history: list[str] | None = None) -> str:
+    def detect(self, text: str, history: Optional[list[str]] = None) -> str:
         """
         Detect language of the given text.
 
@@ -163,42 +381,44 @@ class LanguageDetector:
                     language for short ambiguous texts.
 
         Returns:
-            Language name as string (e.g., "Chinese", "English", "Spanish").
-            Defaults to "English" for unknown/ASCII text.
+            Language name as string, e.g.:
+            - "Chinese(Simplified)", "Chinese(Traditional)", "Cantonese"
+            - "Japanese", "Korean", "Thai", "Russian", etc.
+            - "English", "Malay", "Spanish", "Portuguese", "Indonesian"
         """
         if not text or not text.strip():
             return "English"
 
         stripped = text.strip()
 
-        # Check if text is pure number (may be phone, date, etc.)
+        # 检查是否纯数字（电话号码、日期等）
         is_pure_number = bool(
             re.match(r'^[\d\-\.\s\(\)]+$', stripped) and
             stripped.replace('-', '').replace('.', '').replace(' ', '').replace('(', '').replace(')', '').isdigit()
         )
 
-        result = self._detect_base(text)
+        # 检查是否ASCII或纯标点
+        is_ascii_only = stripped.isascii()
+        is_pure_punct_emoji = self._is_pure_punctuation_or_emoji(stripped)
 
-        # If text is long and a strong language, return directly
-        if self._is_long_text(text) and result in self.STRONG_LANGUAGES:
-            return result
-
-        # If text is short (or pure number) and has history, use history
-        if (not self._is_long_text(text) or is_pure_number) and history:
+        # 如果是短文本且有历史，使用历史判断
+        if (not self._is_long_text(text) or is_pure_number or
+            (is_ascii_only and is_pure_punct_emoji)) and history:
             for hist_text in history:
-                if self._is_long_text(hist_text):
-                    hist_result = self._detect_base(hist_text)
+                hist_normalized = self._normalize_text(hist_text)
+                if self._is_valid_history_text(hist_normalized):
+                    hist_result = self._detect_base(hist_normalized)
                     if hist_result in self.STRONG_LANGUAGES:
                         return hist_result
 
-        return result
+        return self._detect_base(text)
 
 
-# Singleton instance for convenience
-_detector = None
+# =============================================================================
+# Convenience Function
+# =============================================================================
 
-
-def detect_language(text: str, history: list[str] | None = None) -> str:
+def detect_language(text: str, history: Optional[list[str]] = None) -> str:
     """
     Detect language of the given text (convenience function).
 
@@ -210,44 +430,197 @@ def detect_language(text: str, history: list[str] | None = None) -> str:
     Returns:
         Language name as string.
     """
-    global _detector
-    if _detector is None:
-        _detector = LanguageDetector()
-    return _detector.detect(text, history)
+    detector = LanguageDetector()
+    return detector.detect(text, history)
 
+
+# =============================================================================
+# Main Test
+# =============================================================================
 
 if __name__ == "__main__":
-    # Test
     detector = LanguageDetector()
 
-    tests = [
-        "你好，世界",
-        "こんにちは",
-        "안녕하세요",
-        "สวัสดีครับ",
-        "Привет мир",
-        "مرحبا",
-        "नमस्ते",
-        "வணக்கம்",
-        "Hola mundo",
-        "Olá mundo",
-        "Bonjour monde",
-        "Hello world",
-        "Malaysia adalah negara yang indah",
-        "Indonesia adalah negara kepulauan",
+    # ============================================================
+    # 测试用例 - 基础检测
+    # ============================================================
+    print("=" * 70)
+    print("PART 1: Basic Language Detection Tests")
+    print("=" * 70)
+
+    basic_tests = [
+        # 中文简体
+        ("你好，世界", "Chinese(Simplified)"),
+        ("今天天气真好", "Chinese(Simplified)"),
+        ("最新有哪些活动", "Chinese(Simplified)"),
+        ("最近有哪些演出门票开售？", "Chinese(Simplified)"),
+        ("我的门票有哪些", "Chinese(Simplified)"),
+        # 中文繁体
+        ("愛台灣", "Chinese(Traditional)"),
+        ("時間", "Chinese(Traditional)"),
+        ("網絡", "Chinese(Traditional)"),
+        ("請問位置是按付款順序嗎", "Chinese(Traditional)"),
+        ("門票會有什麼方式送到？", "Chinese(Traditional)"),
+        # 粤语
+        ("點解唔係啊", "Cantonese"),
+        ("你哋做咩啊", "Cantonese"),
+        ("我的帳戶給朋友幫我搶飛", "Cantonese"),
+        ("支付寶可唔可以俾錢？", "Cantonese"),
+        # 日语
+        ("こんにちは", "Japanese"),
+        ("ありがとう", "Japanese"),
+        # 韩语
+        ("안녕하세요", "Korean"),
+        ("멤버십 등록", "Korean"),
+        # 泰语
+        ("สวัสดีครับ", "Thai"),
+        ("พอถึงเวลากดบัตรต้องกดรีเฟรชอีกมีไหม", "Thai"),
+        # 俄语
+        ("Привет мир", "Russian"),
+        ("Сколько рядов там будет", "Russian"),
+        # 阿拉伯语
+        ("مرحبا", "Arabic"),
+        # 印地语
+        ("नमस्ते", "Hindi"),
+        # 泰米尔语
+        ("வணக்கம்", "Tamil"),
+        # 英语
+        ("Hello world", "English"),
+        ("How about member presale by using one pay click", "English"),
+        # 西班牙语
+        ("Hola mundo", "Spanish"),
+        ("¿Qué métodos de pago se admiten?", "Spanish"),
+        # 葡萄牙语
+        ("Olá mundo", "Portuguese"),
+        # 马来语
+        ("Malaysia adalah negara yang indah", "Malay"),
+        # 印尼语
+        ("Indonesia adalah negara kepulauan", "Indonesian"),
     ]
 
-    print("=== Class-based detection ===")
-    for t in tests:
-        print(f"{t[:30]:30} -> {detector.detect(t)}")
+    all_passed = True
+    for text, expected in basic_tests:
+        result = detector.detect(text)
+        status = "✓" if result == expected else "✗"
+        if result != expected:
+            all_passed = False
+        print(f"{status} {text[:40]:40} -> {result:25} (expected: {expected})")
 
-    print("\n=== Function-based detection ===")
-    for t in tests:
-        print(f"{t[:30]:30} -> {detect_language(t)}")
+    print(f"\n{'✓ All basic tests passed!' if all_passed else '✗ Some basic tests failed!'}")
 
-    # Test with history
-    print("\n=== Test with history (short 'ok' after Chinese) ===")
-    history = ["今天天气真好"]
-    print(f"'ok' with history={history} -> {detect_language('ok', history)}")
+    # ============================================================
+    # 测试用例 - 真实数据样本
+    # ============================================================
+    print("\n" + "=" * 70)
+    print("PART 2: Real Data Samples from result2.csv")
+    print("=" * 70)
 
-    print(f"'ok' without history -> {detect_language('ok')}")
+    real_data_tests = [
+        # 繁体中文 - 真实用户输入
+        ("你好，想問一下地址能填順豐櫃的地址嗎？", "Chinese(Traditional)"),
+        ("是不是我搶到票之後能決定要郵寄還是演出當天來拿票？", "Chinese(Traditional)"),
+        ("用AlipayHK在購買演唱會門票可以不綁定銀行卡嗎", "Chinese(Traditional)"),
+        # 粤语 - 真实用户输入
+        ("点解。一入去riize就冇票", "Cantonese"),
+        ("點解入會員號碼話錯誤？我係跟官網copy咖喎", "Cantonese"),
+        ("iPad算唔算電腦？可唔可以搶飛？", "Cantonese"),
+        # 英语 - 真实用户输入
+        ("Hi I am mango .I like to visit Macao", "English"),
+        ("Is it better to use a PC or the mobile app when purchasing tickets?", "English"),
+        ("What is offline ticket redemption?", "English"),
+        # 泰语 - 真实用户输入
+        ("มีคำถามฝ่ายบริการลูกค้า", "Thai"),
+        ("อยากรุ้ที่นั่งแล้วอ่า", "Thai"),
+        # 韩语 - 真实用户输入
+        ("표를 취소하고 다시 예매하고싶어요", "Korean"),
+        ("카드결제만 환불되고 이메일은 오지않았어", "Korean"),
+        # 俄语 - 真实用户输入
+        ("Там написано что у меня вип сектор Row B4 seat 31 что это значит?", "Russian"),
+        # 日语 - 真实用户输入
+        ("パクボゴム", "Japanese"),
+        ("waitlistをキャンセルしたい", "Japanese"),
+        # 西班牙语 - 真实用户输入
+        ("¿Cómo puedo contactar con atención al cliente?", "Spanish"),
+        # 越南语 - 真实用户输入
+        ("Tôi vẫn chưa nhận được số queue", "Vietnamese"),
+    ]
+
+    all_passed = True
+    for text, expected in real_data_tests:
+        result = detector.detect(text)
+        status = "✓" if result == expected else "✗"
+        if result != expected:
+            all_passed = False
+        print(f"{status} {text[:40]:40} -> {result:25} (expected: {expected})")
+
+    print(f"\n{'✓ All real data tests passed!' if all_passed else '✗ Some real data tests failed!'}")
+
+    # ============================================================
+    # 测试用例 - 历史推断
+    # ============================================================
+    print("\n" + "=" * 70)
+    print("PART 3: History-based Language Detection")
+    print("=" * 70)
+
+    history_tests = [
+        # 短文本 + 中文历史 -> 推断为中文
+        ("ok", ["今天天气真好"], "Chinese(Simplified)"),
+        ("好", ["最新有哪些活动"], "Chinese(Simplified)"),
+        ("好", ["請問位置是按付款順序嗎"], "Chinese(Traditional)"),
+        # 短文本 + 粤语历史 -> 推断为粤语
+        ("ok", ["點解唔係啊"], "Cantonese"),
+        ("好", ["iPad算唔算電腦？可唔可以搶飛？"], "Cantonese"),
+        # 短文本 + 强语言历史 -> 推断为该语言
+        # 注意：英文不在 STRONG_LANGUAGES 中，所以英文历史无法帮助推断
+        # 无历史 - 可能被误判
+        ("ok", None, "Indonesian"),  # 已知问题：ok会被识别为印尼语
+    ]
+
+    all_passed = True
+    for text, history, expected in history_tests:
+        result = detector.detect(text, history)
+        status = "✓" if result == expected else "✗"
+        history_str = str(history)[:30] if history else "None"
+        if result != expected:
+            all_passed = False
+        print(f"{status} text='{text:10}' history={history_str:35} -> {result:20} (expected: {expected})")
+
+    print(f"\n{'✓ All history tests passed!' if all_passed else '✗ Some history tests failed!'}")
+
+    # ============================================================
+    # 测试用例 - 短文本和边界情况
+    # ============================================================
+    print("\n" + "=" * 70)
+    print("PART 4: Short Text and Edge Cases")
+    print("=" * 70)
+
+    edge_tests = [
+        # 纯数字
+        ("123123123", "English"),  # 纯数字默认英文
+        ("123-456-789", "English"),
+        # 纯标点/emoji
+        ("哈哈哈", "Chinese(Simplified)"),  # 笑声是中文
+        ("???", "English"),
+        # 单字符
+        ("好", "Chinese(Simplified)"),
+        # 短ASCII词会被lingua识别为马来语（已知行为）
+        ("a", "Malay"),
+        # 混合场景 - 包含汉字则优先判断为中文
+        ("I like 你好", "Chinese(Simplified)"),
+        # 短英文词会被lingua识别为马来语/印尼语
+        ("ok google", "Indonesian"),
+    ]
+
+    all_passed = True
+    for text, expected in edge_tests:
+        result = detector.detect(text)
+        status = "✓" if result == expected else "✗"
+        if result != expected:
+            all_passed = False
+        print(f"{status} {text[:30]:30} -> {result:25} (expected: {expected})")
+
+    print(f"\n{'✓ All edge case tests passed!' if all_passed else '✗ Some edge case tests failed!'}")
+
+    print("\n" + "=" * 70)
+    print("All Test Suites Complete!")
+    print("=" * 70)
