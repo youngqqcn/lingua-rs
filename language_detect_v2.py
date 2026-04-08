@@ -30,13 +30,18 @@ class LanguageDetector:
         "Korean": r'[\uac00-\ud7af\u1100-\u11ff]',
         "Thai": r'[\u0e00-\u0e7f]',
         "Cyrillic": r'[\u0400-\u04ff]',
-        "Vietnamese": r'[ăâăắầằẩấđêĩôơưạảấầẩằắặậẽẻẹếềểễệỉịỏọốồổộớờởợụủứừửựỹỵỷ]',
         "Arabic": r'[\u0600-\u06ff\u0750-\u077f]',
         "Devanagari": r'[\u0900-\u097f]',
         "Tamil": r'[\u0b80-\u0bff]',
         "Hebrew": r'[\u0590-\u05ff]',
         "Greek": r'[\u0370-\u03ff]',
     }
+
+    # Vietnamese diacritics - more selective to avoid false positives
+    # Only highly distinctive ones: đ is most unique to Vietnamese
+    VIETNAMESE_DIACRITICS = set('ăâđêôơưấầẩẫắầẩẫặậẽẹềểễệỉọỏốồổộớờởợụủứừửự')
+    # Threshold: at least 2 diacritics OR contains đ (very unique to Vietnamese)
+    VIETNAMESE_MIN_DIACRITICS = 2
 
     # Map lingua Language enum to display names
     LINGUA_LANG_MAP = {
@@ -72,6 +77,12 @@ class LanguageDetector:
             # Other: >= 5 characters
             return len(stripped) >= 5
 
+    def _detect_vietnamese(self, text: str) -> bool:
+        """Check if text is likely Vietnamese based on diacritics."""
+        diacritic_count = sum(1 for c in text if c in self.VIETNAMESE_DIACRITICS)
+        # đ is very unique to Vietnamese, or at least 2 diacritics
+        return 'đ' in text.lower() or diacritic_count >= self.VIETNAMESE_MIN_DIACRITICS
+
     def _detect_by_unicode(self, text: str) -> str | None:
         """Detect language by Unicode character ranges."""
         if not text or not text.strip():
@@ -97,6 +108,8 @@ class LanguageDetector:
             return "Greek"
         if re.search(self.UNICODE_RANGES["Hebrew"], text):
             return "Hebrew"
+        if self._detect_vietnamese(text):
+            return "Vietnamese"
 
         return None
 
