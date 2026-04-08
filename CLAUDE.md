@@ -95,7 +95,7 @@ The `lingua-rs/` directory is a **separate Rust project** that publishes `lingua
    ```toml
    [package]
    name = "lingua"
-   version = "2.4.0"  # Update this
+   version = "2.5.0"  # Update this
    ```
 
 3. **Update classifiers** in `lingua-rs/pyproject.toml` (only list 3.12):
@@ -148,5 +148,5 @@ Do NOT confuse with the main project commits in the parent directory.
 ### PyPI Status
 
 - Package: `lingua-slim`
-- Latest version: 2.4.0
-- Available wheels: `lingua_slim-2.4.0-cp312-cp312-manylinux_2_34_x86_64.whl` (Python 3.12)
+- Latest version: 2.5.0
+- Available wheels: `lingua_slim-2.5.0-cp312-cp312-manylinux_2_34_x86_64.whl` (Python 3.12)
