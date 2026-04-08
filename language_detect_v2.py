@@ -47,9 +47,30 @@ class LanguageDetector:
         Language.INDONESIAN: "Indonesian",
     }
 
+    # Strong languages that can help determine short text language
+    STRONG_LANGUAGES = {
+        "Chinese", "Japanese", "Korean", "Thai", "Russian",
+        "Arabic", "Hindi", "Tamil", "Greek", "Hebrew", "Vietnamese"
+    }
+
     def __init__(self):
         """Initialize the detector."""
         self._detector = None
+
+    def _is_long_text(self, text: str) -> bool:
+        """Check if text is long enough to be used for history."""
+        stripped = text.strip()
+        if stripped.isascii():
+            # English: >= 5 words
+            word_count = len(stripped.split())
+            return word_count >= 5
+        elif any("\u4e00" <= c <= "\u9fff" for c in stripped):
+            # Chinese: >= 5 characters
+            chinese_count = sum(1 for c in stripped if "\u4e00" <= c <= "\u9fff")
+            return chinese_count >= 5
+        else:
+            # Other: >= 5 characters
+            return len(stripped) >= 5
 
     def _detect_by_unicode(self, text: str) -> str | None:
         """Detect language by Unicode character ranges."""
@@ -95,17 +116,8 @@ class LanguageDetector:
             self._detector = self._build_lingua_detector()
         return self._detector
 
-    def detect(self, text: str) -> str:
-        """
-        Detect language of the given text.
-
-        Args:
-            text: Input text to detect language for.
-
-        Returns:
-            Language name as string (e.g., "Chinese", "English", "Spanish").
-            Defaults to "English" for unknown/ASCII text.
-        """
+    def _detect_base(self, text: str) -> str:
+        """Base detection without history."""
         if not text or not text.strip():
             return "English"
 
@@ -128,17 +140,59 @@ class LanguageDetector:
         # Default to English for ASCII-only text
         return "English"
 
+    def detect(self, text: str, history: list[str] | None = None) -> str:
+        """
+        Detect language of the given text.
+
+        Args:
+            text: Input text to detect language for.
+            history: Optional list of previous texts to help determine
+                    language for short ambiguous texts.
+
+        Returns:
+            Language name as string (e.g., "Chinese", "English", "Spanish").
+            Defaults to "English" for unknown/ASCII text.
+        """
+        if not text or not text.strip():
+            return "English"
+
+        stripped = text.strip()
+
+        # Check if text is pure number (may be phone, date, etc.)
+        is_pure_number = bool(
+            re.match(r'^[\d\-\.\s\(\)]+$', stripped) and
+            stripped.replace('-', '').replace('.', '').replace(' ', '').replace('(', '').replace(')', '').isdigit()
+        )
+
+        result = self._detect_base(text)
+
+        # If text is long and a strong language, return directly
+        if self._is_long_text(text) and result in self.STRONG_LANGUAGES:
+            return result
+
+        # If text is short (or pure number) and has history, use history
+        if (not self._is_long_text(text) or is_pure_number) and history:
+            for hist_text in history:
+                if self._is_long_text(hist_text):
+                    hist_result = self._detect_base(hist_text)
+                    if hist_result in self.STRONG_LANGUAGES:
+                        return hist_result
+
+        return result
+
 
 # Singleton instance for convenience
 _detector = None
 
 
-def detect_language(text: str) -> str:
+def detect_language(text: str, history: list[str] | None = None) -> str:
     """
     Detect language of the given text (convenience function).
 
     Args:
         text: Input text to detect language for.
+        history: Optional list of previous texts to help determine
+                language for short ambiguous texts.
 
     Returns:
         Language name as string.
@@ -146,7 +200,7 @@ def detect_language(text: str) -> str:
     global _detector
     if _detector is None:
         _detector = LanguageDetector()
-    return _detector.detect(text)
+    return _detector.detect(text, history)
 
 
 if __name__ == "__main__":
@@ -177,3 +231,10 @@ if __name__ == "__main__":
     print("\n=== Function-based detection ===")
     for t in tests:
         print(f"{t[:30]:30} -> {detect_language(t)}")
+
+    # Test with history
+    print("\n=== Test with history (short 'ok' after Chinese) ===")
+    history = ["今天天气真好"]
+    print(f"'ok' with history={history} -> {detect_language('ok', history)}")
+
+    print(f"'ok' without history -> {detect_language('ok')}")
