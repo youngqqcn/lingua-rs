@@ -8,128 +8,151 @@ Install: pip install lingua-slim
 """
 
 import re
-from functools import lru_cache
+
 from lingua import Language, LanguageDetectorBuilder
 
-# Unicode ranges for various languages/scripts
-UNICODE_RANGES = {
-    # CJK: Chinese, Japanese, Korean
-    "chinese": r'[\u4e00-\u9fff\u3400-\u4dbf]',  # Chinese characters
-    "japanese": r'[\u3040-\u309f\u30a0-\u30ff]',  # Hiragana & Katakana
-    "korean": r'[\uac00-\ud7af\u1100-\u11ff]',  # Korean Hangul
-    # Thai
-    "thai": r'[\u0e00-\u0e7f]',
-    # Cyrillic (Russian, Ukrainian, etc.)
-    "cyrillic": r'[\u0400-\u04ff]',
-    # Vietnamese (Latin with diacritics)
-    "vietnamese": r'[ăâăắầằẩấđêĩôơưạảấầẩằắặậẽẻẹếềểễệỉịỏọốồổộớờởợụủứừửựỹỵỷ]',
-    # Arabic
-    "arabic": r'[\u0600-\u06ff\u0750-\u077f]',
-    # Devanagari (Hindi, Sanskrit)
-    "devanagari": r'[\u0900-\u097f]',
-    # Tamil
-    "tamil": r'[\u0b80-\u0bff]',
-    # Hebrew
-    "hebrew": r'[\u0590-\u05ff]',
-    # Greek
-    "greek": r'[\u0370-\u03ff]',
-}
 
-# Language detection using Unicode ranges
-@lru_cache(maxsize=10000)
-def detect_by_unicode(text: str) -> str | None:
-    """Detect language by Unicode character ranges."""
-    if not text or not text.strip():
+class LanguageDetector:
+    """
+    Language detector combining Unicode-based detection for CJK/Thai/Cyrillic/etc.
+    and lingua-slim for Latin-based language detection.
+
+    Supported languages:
+    - Unicode-based: Chinese, Japanese, Korean, Thai, Russian, Arabic,
+      Hindi, Tamil, Greek, Hebrew, Vietnamese
+    - lingua-slim: English, Malay, Spanish, Portuguese, Indonesian
+    """
+
+    # Unicode ranges for various languages/scripts
+    UNICODE_RANGES = {
+        "Chinese": r'[\u4e00-\u9fff\u3400-\u4dbf]',
+        "Japanese": r'[\u3040-\u309f\u30a0-\u30ff]',
+        "Korean": r'[\uac00-\ud7af\u1100-\u11ff]',
+        "Thai": r'[\u0e00-\u0e7f]',
+        "Cyrillic": r'[\u0400-\u04ff]',
+        "Vietnamese": r'[ăâăắầằẩấđêĩôơưạảấầẩằắặậẽẻẹếềểễệỉịỏọốồổộớờởợụủứừửựỹỵỷ]',
+        "Arabic": r'[\u0600-\u06ff\u0750-\u077f]',
+        "Devanagari": r'[\u0900-\u097f]',
+        "Tamil": r'[\u0b80-\u0bff]',
+        "Hebrew": r'[\u0590-\u05ff]',
+        "Greek": r'[\u0370-\u03ff]',
+    }
+
+    # Map lingua Language enum to display names
+    LINGUA_LANG_MAP = {
+        Language.ENGLISH: "English",
+        Language.MALAY: "Malay",
+        Language.SPANISH: "Spanish",
+        Language.PORTUGUESE: "Portuguese",
+        Language.INDONESIAN: "Indonesian",
+    }
+
+    def __init__(self):
+        """Initialize the detector."""
+        self._detector = None
+
+    def _detect_by_unicode(self, text: str) -> str | None:
+        """Detect language by Unicode character ranges."""
+        if not text or not text.strip():
+            return None
+
+        if re.search(self.UNICODE_RANGES["Chinese"], text):
+            return "Chinese"
+        if re.search(self.UNICODE_RANGES["Japanese"], text):
+            return "Japanese"
+        if re.search(self.UNICODE_RANGES["Korean"], text):
+            return "Korean"
+        if re.search(self.UNICODE_RANGES["Thai"], text):
+            return "Thai"
+        if re.search(self.UNICODE_RANGES["Cyrillic"], text):
+            return "Russian"
+        if re.search(self.UNICODE_RANGES["Arabic"], text):
+            return "Arabic"
+        if re.search(self.UNICODE_RANGES["Devanagari"], text):
+            return "Hindi"
+        if re.search(self.UNICODE_RANGES["Tamil"], text):
+            return "Tamil"
+        if re.search(self.UNICODE_RANGES["Greek"], text):
+            return "Greek"
+        if re.search(self.UNICODE_RANGES["Hebrew"], text):
+            return "Hebrew"
+
         return None
 
-    # Check for CJK characters
-    if re.search(UNICODE_RANGES["chinese"], text):
-        return "chinese"
-    if re.search(UNICODE_RANGES["japanese"], text):
-        return "japanese"
-    if re.search(UNICODE_RANGES["korean"], text):
-        return "korean"
-    if re.search(UNICODE_RANGES["thai"], text):
-        return "thai"
-    if re.search(UNICODE_RANGES["cyrillic"], text):
-        return "russian"  # Most common Cyrillic language
-    if re.search(UNICODE_RANGES["arabic"], text):
-        return "arabic"
-    if re.search(UNICODE_RANGES["devanagari"], text):
-        return "hindi"
-    if re.search(UNICODE_RANGES["tamil"], text):
-        return "tamil"
-    if re.search(UNICODE_RANGES["greek"], text):
-        return "greek"
-    if re.search(UNICODE_RANGES["hebrew"], text):
-        return "hebrew"
+    def _build_lingua_detector(self):
+        """Build lingua detector with 5 languages."""
+        return LanguageDetectorBuilder.from_languages(
+            Language.ENGLISH,
+            Language.MALAY,
+            Language.SPANISH,
+            Language.PORTUGUESE,
+            Language.INDONESIAN,
+        ).build()
 
-    return None
+    def _get_lingua_detector(self):
+        """Get singleton lingua detector."""
+        if self._detector is None:
+            self._detector = self._build_lingua_detector()
+        return self._detector
+
+    def detect(self, text: str) -> str:
+        """
+        Detect language of the given text.
+
+        Args:
+            text: Input text to detect language for.
+
+        Returns:
+            Language name as string (e.g., "Chinese", "English", "Spanish").
+            Defaults to "English" for unknown/ASCII text.
+        """
+        if not text or not text.strip():
+            return "English"
+
+        text = text.strip()
+
+        # First try Unicode-based detection for non-latin languages
+        unicode_lang = self._detect_by_unicode(text)
+        if unicode_lang:
+            return unicode_lang
+
+        # Then try lingua for latin-based languages
+        try:
+            detector = self._get_lingua_detector()
+            result = detector.detect_language_of(text)
+            if result:
+                return self.LINGUA_LANG_MAP.get(result, "English")
+        except Exception:
+            pass
+
+        # Default to English for ASCII-only text
+        return "English"
 
 
-def build_lingua_detector():
-    """Build lingua detector with 5 languages: English, Malay, Spanish, Portuguese, Indonesian."""
-    return LanguageDetectorBuilder.from_languages(
-        Language.ENGLISH,
-        Language.MALAY,
-        Language.SPANISH,
-        Language.PORTUGUESE,
-        Language.INDONESIAN,
-    ).build()
-
-
-# Global detector instance
+# Singleton instance for convenience
 _detector = None
-
-
-def get_lingua_detector():
-    """Get singleton lingua detector."""
-    global _detector
-    if _detector is None:
-        _detector = build_lingua_detector()
-    return _detector
 
 
 def detect_language(text: str) -> str:
     """
-    Detect language of the given text.
+    Detect language of the given text (convenience function).
 
-    Returns language name: chinese, japanese, korean, thai, russian,
-    arabic, hindi, tamil, greek, hebrew, malay, spanish, portuguese,
-    indonesian, or english (default).
+    Args:
+        text: Input text to detect language for.
+
+    Returns:
+        Language name as string.
     """
-    if not text or not text.strip():
-        return "english"
-
-    text = text.strip()
-
-    # First try Unicode-based detection for non-latin languages
-    unicode_lang = detect_by_unicode(text)
-    if unicode_lang:
-        return unicode_lang
-
-    # Then try lingua for latin-based languages
-    try:
-        detector = get_lingua_detector()
-        result = detector.detect_language_of(text)
-        if result:
-            lang_map = {
-                Language.ENGLISH: "english",
-                Language.MALAY: "malay",
-                Language.SPANISH: "spanish",
-                Language.PORTUGUESE: "portuguese",
-                Language.INDONESIAN: "indonesian",
-            }
-            return lang_map.get(result, "english")
-    except Exception:
-        pass
-
-    # Default to English for ASCII-only text
-    return "english"
+    global _detector
+    if _detector is None:
+        _detector = LanguageDetector()
+    return _detector.detect(text)
 
 
 if __name__ == "__main__":
     # Test
+    detector = LanguageDetector()
+
     tests = [
         "你好，世界",
         "こんにちは",
@@ -147,5 +170,10 @@ if __name__ == "__main__":
         "Indonesia adalah negara kepulauan",
     ]
 
+    print("=== Class-based detection ===")
+    for t in tests:
+        print(f"{t[:30]:30} -> {detector.detect(t)}")
+
+    print("\n=== Function-based detection ===")
     for t in tests:
         print(f"{t[:30]:30} -> {detect_language(t)}")
