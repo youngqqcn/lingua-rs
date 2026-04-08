@@ -144,6 +144,9 @@ Do NOT confuse with the main project commits in the parent directory.
 - **Poetry compatibility**: Poetry fails with "Unable to find installation candidates" when `requires-python` doesn't match environment - set `requires-python = ">=3.12"`
 - **uv advantage**: `uv pip install` handles binary wheels better than Poetry
 - **Python 3.12 ONLY**: Coze plugin uses Python 3.12, so PyPI must host cp312 wheels
+- **twine upload**: Use `twine upload` instead of curl - it properly handles version management
+- **--skip-existing**: Only skips if exact filename exists; for new versions, use `twine upload` without this flag
+- **curl upload issue**: curl returns 404 even when upload succeeds (file already exists on PyPI), making it unreliable for verification
 
 ### PyPI Status
 
