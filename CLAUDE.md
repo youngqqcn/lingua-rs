@@ -119,6 +119,7 @@ The `lingua-rs/` directory is a **separate Rust project** that publishes `lingua
    cd lingua-rs
    maturin build --interpreter /usr/bin/python3.12 --release
    ```
+   - `dist/`, `*.whl`, `uv.lock` are gitignored (build artifacts)
 
 6. **Upload to PyPI**:
    ```bash
