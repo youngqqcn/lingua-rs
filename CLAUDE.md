@@ -107,16 +107,35 @@ The `lingua-rs/` directory is a **separate Rust project** that publishes `lingua
    ]
    ```
 
-4. **Build wheel**:
+4. **Commit lingua-rs changes** (separate git repo):
+   ```bash
+   cd lingua-rs
+   git add Cargo.toml Cargo.lock pyproject.toml
+   git commit -m "feat: bump version to x.x.x"
+   ```
+
+5. **Build wheel**:
    ```bash
    cd lingua-rs
    maturin build --interpreter /usr/bin/python3.12 --release
    ```
 
-5. **Upload to PyPI**:
+6. **Upload to PyPI**:
    ```bash
    twine upload --skip-existing target/wheels/lingua_slim-*.whl
    ```
+
+### ⚠️ Important: Separate Git Repository
+
+**`lingua-rs/` is a separate git repository** - you MUST commit changes there separately:
+
+```bash
+cd lingua-rs
+git add <changed files>
+git commit -m "your message"
+```
+
+Do NOT confuse with the main project commits in the parent directory.
 
 ### Key Lessons
 
