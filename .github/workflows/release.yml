@@ -9,7 +9,7 @@
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied.
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
@@ -18,101 +18,30 @@ name: Release
 on:
   push:
     tags:
-      - v1.8.*
+      - 'v*'
 
 jobs:
-  python-linux-release-build:
-    name: Python Release Build on Linux and target ${{ matrix.target }}
-
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        target: [ x86_64, aarch64 ]
-        linux: [ auto, musllinux_1_2 ]
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist -i 3.12 3.13 3.14 pypy3.11
-          sccache: 'true'
-          manylinux: ${{ matrix.linux }}
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v5
-        with:
-          name: linux-${{ matrix.linux }}-${{ matrix.target }}-wheels
-          path: dist
-
-  python-windows-release-build:
-    name: Python Release Build on Windows and target ${{ matrix.target }}
-
-    runs-on: windows-latest
-
-    strategy:
-      matrix:
-        target: [ x86_64, aarch64 ]
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist -i 3.12 3.13 3.14
-          sccache: 'true'
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v5
-        with:
-          name: windows-${{ matrix.target }}-wheels
-          path: dist
-
-  python-macos-release-build:
-    name: Python Release Build on MacOS and target ${{ matrix.target }}
-
-    runs-on: macos-latest
-
-    strategy:
-      matrix:
-        target: [ x86_64, aarch64 ]
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Build wheels
-        uses: PyO3/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          args: --release --out dist -i 3.12 3.13 3.14 pypy3.11
-          sccache: 'true'
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v5
-        with:
-          name: macos-${{ matrix.target }}-wheels
-          path: dist
-
-  python-release-upload:
-    name: Publish wheels to PyPI
-    needs: [ python-linux-release-build, python-windows-release-build, python-macos-release-build ]
+  build:
+    name: Build wheels and sdist
 
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download wheels from previous jobs
-        uses: actions/download-artifact@v6
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build wheels for all Python versions
+        uses: PyO3/maturin-action@v1
         with:
-          path: wheels
-          merge-multiple: true
+          args: --release --features python --out dist -i 3.10 3.11 3.12 3.13 3.14
+          sccache: 'true'
+          manylinux: auto
+
+      - name: Build source distribution
+        uses: PyO3/maturin-action@v1
+        with:
+          args: --release --features python --out dist --sdist
+          sccache: 'true'
 
       - name: Upload to PyPI
         uses: PyO3/maturin-action@v1
@@ -120,21 +49,4 @@ jobs:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
-          args: --skip-existing wheels/*.whl
-
-  rust-release-upload:
-    name: Upload to crates.io
-    needs: [ python-linux-release-build, python-windows-release-build, python-macos-release-build ]
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Upload release to crates.io
-        uses: katyo/publish-crates@v2
-        with:
-          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-          args: --workspace
-          publish-delay: 60000
+          args: --skip-existing dist/*
