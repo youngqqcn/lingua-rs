@@ -514,12 +514,18 @@ class LanguageDetector:
             # 找到出现最多的语言
             if hist_lang_counts:
                 total = sum(hist_lang_counts.values())
-                # 历史记录至少4条以上才进行历史判断
-                if total > 3:
-                    dominant_lang = max(hist_lang_counts, key=lambda k: hist_lang_counts[k])
-                    # 如果dominant语言出现次数超过70%，使用它
-                    if hist_lang_counts[dominant_lang] / total >= 0.7:
-                        return dominant_lang
+                dominant_lang = max(hist_lang_counts, key=lambda k: hist_lang_counts[k])
+                ratio = hist_lang_counts[dominant_lang] / total
+
+                # 历史判断逻辑：
+                # - 至少需要4条有效历史记录，且
+                # - dominant语言比例超过70%
+                # - 但如果只有1条历史且是100%中文，短文本也应该采纳
+                if total >= 4 and ratio >= 0.7:
+                    return dominant_lang
+                # 只有1条历史记录时，如果是100%同一种语言，短文本采纳
+                if total == 1 and ratio == 1.0:
+                    return dominant_lang
 
         return self._detect_base(text)
 

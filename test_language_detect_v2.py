@@ -315,10 +315,14 @@ class TestHistoryBasedDetection:
     """
 
     def test_insufficient_history_ignored(self, detector):
-        """With fewer than 4 history entries, history doesn't apply."""
-        # Only 1 history entry
+        """With fewer than 4 history entries, history may still apply if 100% dominant.
+
+        Note: Even with only 1 history entry, if it's 100% one language (e.g., Chinese),
+        short text will follow that history.
+        """
+        # Only 1 history entry - but it's 100% Chinese, so short text follows Chinese
         result = detector.detect("obrigado", ["今天天气真好"])
-        assert result == "Portuguese"  # Falls back to base detection
+        assert result == "Chinese(Simplified)"  # 1条100%历史会被采纳
 
     def test_history_with_4_chinese_entries(self, detector):
         """History with 4+ Chinese entries should influence detection."""
