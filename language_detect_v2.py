@@ -192,7 +192,7 @@ class LanguageDetector:
                     if (i >= len(to_traditional) or text[i] != to_traditional[i]))
 
         # 繁体特有字符集合
-        TRADITIONAL_SPECIFIC = set('時關閉顯敗賬號場館島龍裏過報簽遞鳥輸優購會員嗎馬罵碼臺們樣點電機話遲礦務國陸內圖數據諮詢證離開單達運資絡網價過錢預賬戶郵詐騙時間麼轉賣買飛會丟並亞佇佈佔併來係倉個們倫側偵偽傑傘備傳傷僅價儘償優儲兌兒內兩冊凍別刪則剛創剷劃劍動務勢匯區協卻厭參員唄問啟喎單嗎嗰嘗嘩囉國圍圖團報場墮夠夢夾媽嬌學實審寫寵寶將專尋對導層屬峯帥帳帶幣幫幹幾庫廈廢廣廳張強彈後徑從復恆惡愛態慘慮憑應懷戶掃掛採揀換損搖搵搶撐撳擁擇擊擋擔據擠擬擺攜攤攪攬敗數斃斷於時暫書會東條棄業極榮構樂樑樓標樣機檔檢檯檻櫃欄權歐歡歲歸毀氈氣決沒沖況洩淚淨減測準溝溫滅滙滾漢漣潰濤濫瀏灘灣為無煩熱燈爛爾牆狀猶獅獎獨獲現環產畢畫異當發盜盡盤盧眾瞞確碼礙禮種稱穩筆節範簡簽籌籬紀約紅納純紙級細終結絡給統絲綁經綜線維網綴綵緊線編練縮總繫繳繼續罵習聖聯職聽脫腦腳膽臉臨臺與舉舊華萬蓋薦藍藝蘇處虛號螞蟻術衛衝裡補裝裡製複見規視親覺覽觀訂計訊託記')
+        TRADITIONAL_SPECIFIC = set('時關閉顯敗賬號場館島龍裏過報簽遞鳥輸優購會員嗎馬罵碼臺們樣點電機話遲礦務國陸內圖數據諮詢證離開單達運資絡網價過錢預賬戶郵詐騙時間麼轉賣買飛會門丟並亞佇佈佔併來係倉個們倫側偵偽傑傘備傳傷僅價儘償優儲兌兒內兩冊凍別刪則剛創剷劃劍動務勢匯區協卻厭參員唄問啟喎單嗎嗰嘗嘩囉國圍圖團報場墮夠夢夾媽嬌學實審寫寵寶將專尋對導層屬峯帥帳帶幣幫幹幾庫廈廢廣廳張強彈後徑從復恆惡愛態慘慮憑應懷戶掃掛採揀換損搖搵搶撐撳擁擇擊擋擔據擠擬擺攜攤攪攬敗數斃斷於時暫書會東條棄業極榮構樂樑樓標樣機檔檢檯檻櫃欄權歐歡歲歸毀氈氣決沒沖況洩淚淨減測準溝溫滅滙滾漢漣潰濤濫瀏灘灣為無煩熱燈爛爾牆狀猶獅獎獨獲現環產畢畫異當發盜盡盤盧眾瞞確碼礙禮種稱穩筆節範簡簽籌籬紀約紅納純紙級細終結絡給統絲綁經綜線維網綴綵緊線編練縮總繫繳繼續罵習聖聯職聽脫腦腳膽臉臨臺與舉舊華萬蓋薦藍藝蘇處虛號螞蟻術衛衝裡補裝裡製複見規視親覺覽觀訂計訊託記請順問設計')
 
         if diff_s == 0 and diff_t == 0:
             return any(c in TRADITIONAL_SPECIFIC for c in text)
@@ -209,11 +209,22 @@ class LanguageDetector:
             return count / chinese_count > 0.3
 
         diff_diff = diff_s - diff_t
-        if abs(diff_diff) < 2:
-            count = sum(1 for c in text if c in TRADITIONAL_SPECIFIC)
-            return count / chinese_count > 0.3
 
-        return diff_s > diff_t
+        # 核心逻辑：
+        # - diff_s > diff_t: 转为简体需要更多变化，说明原文是繁体
+        # - diff_t > diff_s: 转为繁体需要更多变化，说明原文是简体
+        # - diff_s == diff_t: 两种转换变化相同，使用TRADITIONAL_SPECIFIC判断
+
+        if diff_diff > 0:  # diff_s > diff_t -> Traditional
+            return True
+        if diff_diff < 0:  # diff_t > diff_s -> Simplified
+            return False
+
+        # diff_s == diff_t 时，使用繁体特有字符比例判断
+        count = sum(1 for c in text if c in TRADITIONAL_SPECIFIC)
+        if chinese_count > 0:
+            return count / chinese_count > 0.3
+        return False
 
     def _detect_chinese_variant(self, text: str) -> Optional[str]:
         """检测中文变体：简体、繁体或粤语
@@ -283,13 +294,52 @@ class LanguageDetector:
             return True
         return False
 
+    def _has_unicode_signal(self, text: str) -> bool:
+        """判断文本是否有强Unicode语言信号（非中文）"""
+        if re.search(self.UNICODE_RANGES["Japanese"], text):
+            return True
+        if re.search(self.UNICODE_RANGES["Korean"], text):
+            return True
+        if re.search(self.UNICODE_RANGES["Thai"], text):
+            return True
+        if re.search(self.UNICODE_RANGES["Cyrillic"], text):
+            return True
+        if re.search(self.UNICODE_RANGES["Arabic"], text):
+            return True
+        if re.search(self.UNICODE_RANGES["Devanagari"], text):
+            return True
+        if re.search(self.UNICODE_RANGES["Tamil"], text):
+            return True
+        if re.search(self.UNICODE_RANGES["Greek"], text):
+            return True
+        if re.search(self.UNICODE_RANGES["Hebrew"], text):
+            return True
+        if self._detect_vietnamese(text):
+            return True
+        return False
+
+    def _is_long_latin_text(self, text: str) -> bool:
+        """判断是否为足够长的拉丁文字本（可用于历史参考）"""
+        stripped = text.strip()
+        if stripped.isascii():
+            word_count = len(stripped.split())
+            return word_count >= 5
+        return len(stripped) >= 10
+
     def _is_valid_history_text(self, text: str) -> bool:
-        """判断文本是否可作为有效历史参考"""
+        """判断文本是否可作为有效历史参考（支持多语言）"""
+        # 中文文本
         if self._is_long_chinese_text(text):
             return True
         if self._has_strong_chinese_signal(text):
             return True
         if self._has_chinese(text):
+            return True
+        # 其他Unicode语言（日韩泰俄等）
+        if self._has_unicode_signal(text):
+            return True
+        # 足够长的拉丁文字本
+        if self._is_long_latin_text(text):
             return True
         return False
 
@@ -440,15 +490,22 @@ class LanguageDetector:
             stripped.replace('-', '').replace('.', '').replace(' ', '').replace('(', '').replace(')', '').isdigit()
         )
 
-        # 检查是否ASCII或纯标点
+        # 检查是否ASCII或纯标点/emoji
         is_ascii_only = stripped.isascii()
         is_pure_punct_emoji = self._is_pure_punctuation_or_emoji(stripped)
 
-        # 如果是短文本且有历史，使用历史判断
-        if (not self._is_long_text(text) or is_pure_number or
-            (is_ascii_only and is_pure_punct_emoji)) and history:
+        # 短文本或纯emoji/标点文本，如果有历史则使用历史判断
+        text_is_short_or_pure = (
+            not self._is_long_text(text) or
+            is_pure_number or
+            (is_ascii_only and is_pure_punct_emoji) or
+            is_pure_punct_emoji
+        )
+        should_use_history = bool(text_is_short_or_pure) and history
+
+        if should_use_history:
             hist_lang_counts: dict[str, int] = {}
-            for hist_text in history:
+            for hist_text in history or []:
                 hist_normalized = self._normalize_text(hist_text)
                 if self._is_valid_history_text(hist_normalized):
                     hist_result = self._detect_base(hist_normalized)

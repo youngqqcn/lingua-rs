@@ -1,6 +1,15 @@
 version = 1
 revision = 1
-requires-python = ">=3.12"
+requires-python = ">=3.12, <3.15"
+
+[[package]]
+name = "colorama"
+version = "0.4.6"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697 }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335 },
+]
 
 [[package]]
 name = "cs-language-detect"
@@ -11,19 +20,45 @@ dependencies = [
     { name = "opencc-python-reimplemented" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
-    { name = "lingua-slim", specifier = ">=2.4.0" },
+    { name = "lingua-slim", specifier = ">=2.8.0" },
     { name = "opencc-python-reimplemented", specifier = ">=0.1.7" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.0.3" }]
+
+[[package]]
+name = "iniconfig"
+version = "2.3.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/72/34/14ca021ce8e5dfedc35312d08ba8bf51fdd999c576889fc2c24cb97f4f10/iniconfig-2.3.0.tar.gz", hash = "sha256:c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730", size = 20503 }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484 },
 ]
 
 [[package]]
 name = "lingua-slim"
-version = "2.4.0"
+version = "2.10.0"
 source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/d7/db/3fe5f33114a8bbd3fe962f95b3731c0b343720b91eb549b8461cd9de089c/lingua_slim-2.10.0.tar.gz", hash = "sha256:6fb1726df2d33770b4c79c2584d6cc00d51f54dee3d4d3fbf68b415c8d2a12ba", size = 16881326 }
 wheels = [
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/b9/53/bcd0f1d0805796f9591077eecce86ac552862d5c1313a3ee9f48cb4fd524/lingua_slim-2.4.0-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:16c3d3b2d79099c98e38303a0f791701d2c38dcc14138700ab819e7d5d871a44", size = 14959846 },
-    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/46/10/b34868bb6e0e33e74b1dfb36dd4baf385beec160c319f1880b6ff98bcb67/lingua_slim-2.4.0-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:7026e1e383ca548ef985a9c0acd80abc118ae46a5484ba714f05edacff70acbe", size = 14959257 },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/ca/de/681829ae9cd421a86ad1a6c04d1ed781b1553b5d70bde36d617551a14fd7/lingua_slim-2.10.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:4c0562c9ff95435c154df94191f418f895fdcd4aa8a079f35f567b6223254d5d", size = 14971937 },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/8e/13/c81f3715366cd218e5ab78bb4b38cd2b9ba83e3dae0c8890c13bb6761246/lingua_slim-2.10.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d0f81ac11ef1b776f689ccde6ebb5cca3c0d00ded2b3d9a14e588a29c6e48637", size = 14959059 },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/ca/cf/d657c7405b050aac371bfef60b066d3d46b40f2224938272baace11d42cc/lingua_slim-2.10.0-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:36e700639e592a9d9cf2419b7fabd61fdbc156a9c8e132443093a2ae0ed3de0b", size = 14958956 },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/ac/64/db9d246518c4cd03f19290e770c39589e7f8790d951c7c9495be997d8e45/lingua_slim-2.10.0-cp312-cp312-win_amd64.whl", hash = "sha256:6bcbedf6accf872ba683815f321fd8d4c709554397debecbc03d610a84ae6d63", size = 14674437 },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/52/02/da052dcd3debd6251d8b10a4a265b0ce7905a30af22dff6acb617e2ebabc/lingua_slim-2.10.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:a982c2a3ddaaa75ba587f5d7cda99609ad171da28ffe048bf3eb57678e5d79fe", size = 14972157 },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/95/f2/872eaad7d1bb514ab735e680d83bc4883c51046e0c99237c7e449946b4a0/lingua_slim-2.10.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e94b9b9c6965dcf36be55d7e7b8def746058beb54db922963282be1dda04830f", size = 14958664 },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/f0/24/fb471a2470eb678c4ccb0cd0b53b956f6530a591ecee9f6e8c37f15a9ea3/lingua_slim-2.10.0-cp313-cp313-win_amd64.whl", hash = "sha256:db7382bc7112efef27981d0651fb35abb237d0dac8d53bc5b3ed42bc615ca56a", size = 14674587 },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/2b/1e/f7542e06843d1c22a83514e877a16940b7a183271d20debc3cd1ae861595/lingua_slim-2.10.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:99c290138a0ea7a71cf199220366218d192c0d39e06f7416cfdd59b4e41ce665", size = 14969478 },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/e7/fd/70b624b48dd1735bf19065c0f3ef4db81748424ad3169a863ec03411ed66/lingua_slim-2.10.0-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:47efa0060fc4703ded2f2df6d8ce7cde114ba5ec4da5d143de1454828645f1e3", size = 14959118 },
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/8e/38/0716c42057f6a245bf309b84875cbefb39e3e99fd4368a57bacd666a5f05/lingua_slim-2.10.0-cp314-cp314-win_amd64.whl", hash = "sha256:7b61de41301c7363e6dffa81c791dfebe26c54f07c63e83740c2f8842066dfe0", size = 14675374 },
 ]
 
 [[package]]
@@ -33,4 +68,47 @@ source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
 sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/8d/6d/c6f37eed651dd6b752e50f80a93396cdaa42a6acc6ce05ad7452303ea511/opencc-python-reimplemented-0.1.7.tar.gz", hash = "sha256:4f777ea3461a25257a7b876112cfa90bb6acabc6dfb843bf4d11266e43579dee", size = 482566 }
 wheels = [
     { url = "https://pypi.tuna.tsinghua.edu.cn/packages/30/6b/055b7806f320cc8f2cdf23c5f70221c0dc1683fca9ffaf76dfc2ad4b91b6/opencc_python_reimplemented-0.1.7-py2.py3-none-any.whl", hash = "sha256:41b3b92943c7bed291f448e9c7fad4b577c8c2eae30fcfe5a74edf8818493aa6", size = 481813 },
+]
+
+[[package]]
+name = "packaging"
+version = "26.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/65/ee/299d360cdc32edc7d2cf530f3accf79c4fca01e96ffc950d8a52213bd8e4/packaging-26.0.tar.gz", hash = "sha256:00243ae351a257117b6a241061796684b084ed1c516a08c48a3f7e147a9d80b4", size = 143416 }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/b7/b9/c538f279a4e237a006a2c98387d081e9eb060d203d8ed34467cc0f0b9b53/packaging-26.0-py3-none-any.whl", hash = "sha256:b36f1fef9334a5588b4166f8bcd26a14e521f2b55e6b9de3aaa80d3ff7a37529", size = 74366 },
+]
+
+[[package]]
+name = "pluggy"
+version = "1.6.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412 }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538 },
+]
+
+[[package]]
+name = "pygments"
+version = "2.20.0"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f", size = 4955991 }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151 },
+]
+
+[[package]]
+name = "pytest"
+version = "9.0.3"
+source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "iniconfig" },
+    { name = "packaging" },
+    { name = "pluggy" },
+    { name = "pygments" },
+]
+sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/7d/0d/549bd94f1a0a402dc8cf64563a117c0f3765662e2e668477624baeec44d5/pytest-9.0.3.tar.gz", hash = "sha256:b86ada508af81d19edeb213c681b1d48246c1a91d304c6c81a427674c17eb91c", size = 1572165 }
+wheels = [
+    { url = "https://pypi.tuna.tsinghua.edu.cn/packages/d4/24/a372aaf5c9b7208e7112038812994107bc65a84cd00e0354a88c2c77a617/pytest-9.0.3-py3-none-any.whl", hash = "sha256:2c5efc453d45394fdd706ade797c0a81091eccd1d6e4bccfcd476e2b8e0ab5d9", size = 375249 },
 ]
