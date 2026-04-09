@@ -85,59 +85,48 @@ The `lingua-rs/` directory is a **separate Rust project** that publishes `lingua
 
 ### Publishing Steps
 
+**Option A: Use the publish script (recommended)**
+```bash
+cd lingua-rs
+./publish.sh 2.6.0
+```
+
+**Option B: Manual steps**
+
 1. **Update version** in `lingua-rs/Cargo.toml`:
    ```toml
    [package]
    name = "lingua"
-   version = "2.5.0"  # Update this
+   version = "2.6.0"  # Update this
    ```
 
 2. **Update version** in `lingua-rs/pyproject.toml`:
    ```toml
    [project]
-   version = "2.5.0"  # Update this
+   version = "2.6.0"  # Update this
    ```
 
-3. **Commit lingua-rs changes** (separate git repo):
+3. **Commit, build, upload**:
    ```bash
    cd lingua-rs
    git add Cargo.toml Cargo.lock pyproject.toml
    git commit -m "feat: bump version to x.x.x"
+
+   # Build all wheels
+   for py in 3.10 3.11 3.12 3.13 3.14; do
+       maturin build --interpreter $(uv python list --only-installed | grep "cpython-${py}" | head -1 | awk '{print $2}') --release --out target/wheels
+   done
+
+   # Upload
+   twine upload target/wheels/lingua_slim-x.x.x-*.whl
    ```
 
-4. **Build wheels for all Python versions**:
-   ```bash
-   cd lingua-rs
-
-   # Python 3.10
-   maturin build --interpreter $(uv python list --only-installed | grep 3.10 | head -1 | awk '{print $2}') --release --out target/wheels
-
-   # Python 3.11
-   maturin build --interpreter $(uv python list --only-installed | grep 3.11 | head -1 | awk '{print $2}') --release --out target/wheels
-
-   # Python 3.12
-   maturin build --interpreter $(uv python list --only-installed | grep 3.12 | head -1 | awk '{print $2}') --release --out target/wheels
-
-   # Python 3.13
-   maturin build --interpreter $(uv python list --only-installed | grep 3.13 | head -1 | awk '{print $2}') --release --out target/wheels
-
-   # Python 3.14
-   maturin build --interpreter $(uv python list --only-installed | grep 3.14 | head -1 | awk '{print $2}') --release --out target/wheels
-   ```
-   - All wheels will be in `target/wheels/` directory
-   - `dist/`, `*.whl`, `uv.lock` are gitignored (build artifacts)
-
-5. **Upload all wheels to PyPI**:
-   ```bash
-   twine upload target/wheels/lingua_slim-*.whl
-   ```
-
-6. **Verify on PyPI**:
+4. **Verify on PyPI**:
    ```bash
    curl -s https://pypi.org/pypi/lingua-slim/<version>/json | python3 -c "import sys,json; d=json.load(sys.stdin); print('Available wheels:'); [print(' ', w['filename']) for w in d['urls']]"
    ```
 
-7. **Update parent repo CLAUDE.md** with new PyPI status
+5. **Update parent repo CLAUDE.md** with new PyPI status
 
 ### ⚠️ Important: Separate Git Repository
 
