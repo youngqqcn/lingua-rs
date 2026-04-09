@@ -15,7 +15,7 @@
 
 [project]
 name = "lingua-slim"
-version = "2.6.0"
+version = "2.7.0"
 authors = [{ name = "yqq", email = "yqq@yqq.cn" }]
 description = "A slimmed-down language detection library - English, French, Malay, Spanish, Portuguese, Indonesian. Other languages use Unicode detection."
 readme = "README_PYPI.md"
