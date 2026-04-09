@@ -447,12 +447,20 @@ class LanguageDetector:
         # 如果是短文本且有历史，使用历史判断
         if (not self._is_long_text(text) or is_pure_number or
             (is_ascii_only and is_pure_punct_emoji)) and history:
+            hist_lang_counts: dict[str, int] = {}
             for hist_text in history:
                 hist_normalized = self._normalize_text(hist_text)
                 if self._is_valid_history_text(hist_normalized):
                     hist_result = self._detect_base(hist_normalized)
-                    if hist_result in self.STRONG_LANGUAGES:
-                        return hist_result
+                    hist_lang_counts[hist_result] = hist_lang_counts.get(hist_result, 0) + 1
+
+            # 找到出现最多的语言
+            if hist_lang_counts:
+                dominant_lang = max(hist_lang_counts, key=lambda k: hist_lang_counts[k])
+                total = sum(hist_lang_counts.values())
+                # 如果dominant语言出现次数超过60%，使用它
+                if hist_lang_counts[dominant_lang] / total >= 0.6:
+                    return dominant_lang
 
         return self._detect_base(text)
 
