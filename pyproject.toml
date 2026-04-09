@@ -19,7 +19,7 @@ version = "2.6.0"
 authors = [{ name = "yqq", email = "yqq@yqq.cn" }]
 description = "A slimmed-down language detection library - English, French, Malay, Spanish, Portuguese, Indonesian. Other languages use Unicode detection."
 readme = "README_PYPI.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 keywords = [
     "language-detection",
