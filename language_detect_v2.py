@@ -343,12 +343,48 @@ class LanguageDetector:
             self._detector = self._build_lingua_detector()
         return self._detector
 
+    # 常见英文单词（短文本容易误判）
+    COMMON_ENGLISH_WORDS = {
+        "hello", "hi", "hey", "yes", "no", "ok", "okay",
+        "good", "great", "nice", "well", "fine", "bad",
+        "thank", "thanks", "sorry", "please", "help",
+        "love", "like", "want", "need", "know", "think",
+        "make", "take", "come", "here", "there", "where",
+        "what", "when", "why", "how", "who", "which",
+        "this", "that", "these", "those", "it", "is", "are",
+        "was", "were", "been", "have", "has", "had",
+        "do", "does", "did", "will", "would", "could", "should",
+        "can", "may", "might", "must", "shall",
+        "i", "me", "my", "we", "us", "our", "you", "your",
+        "he", "she", "him", "her", "his", "they", "them", "their",
+        "the", "a", "an", "of", "in", "to", "for", "on", "at",
+        "by", "with", "from", "or", "and", "but", "if", "not",
+        "up", "down", "out", "over", "under", "again", "more",
+        "all", "any", "some", "most", "other", "such", "only",
+        "same", "so", "than", "too", "very", "just", "now",
+        "then", "also", "back", "about", "after", "before",
+        "world", "text", "test", "code", "file", "data",
+        "name", "time", "way", "day", "year", "work", "thing",
+        "people", "child", "man", "woman", "see", "look", "get",
+        "use", "find", "give", "tell", "ask", "try", "call",
+        "keep", "let", "put", "show", "hear", "play", "run",
+        "move", "live", "believe", "hold", "bring", "happen",
+        "write", "provide", "sit", "stand", "lose", "pay",
+        "meet", "include", "continue", "set", "learn", "change",
+        "lead", "understand", "watch", "follow", "stop", "create",
+        "speak", "read", "spend", "grow", "open", "walk", "win",
+        "offer", "remember", "love", "consider", "appear", "buy",
+        "wait", "serve", "die", "send", "expect", "build", "stay",
+        "fall", "cut", "reach", "kill", "remain", "suggest", "raise",
+    }
+
     def _detect_base(self, text: str) -> str:
         """Base detection without history."""
         if not text or not text.strip():
             return "English"
 
         text = text.strip()
+        text_lower = text.lower()
 
         # 首先尝试中文变体检测（使用OpenCC）
         chinese_variant = self._detect_chinese_variant(text)
@@ -360,11 +396,18 @@ class LanguageDetector:
         if unicode_lang:
             return unicode_lang
 
+        # 短文本特殊处理：常见英文单词直接返回English
+        if len(text) <= 5 and text_lower in self.COMMON_ENGLISH_WORDS:
+            return "English"
+
         # 最后用lingua检测Latin语言
         try:
             detector = self._get_lingua_detector()
             result = detector.detect_language_of(text)
             if result:
+                # 短文本结果特殊处理
+                if len(text) <= 10 and result == Language.SPANISH and text_lower in self.COMMON_ENGLISH_WORDS:
+                    return "English"
                 return self.LINGUA_LANG_MAP.get(result, "English")
         except Exception:
             pass
