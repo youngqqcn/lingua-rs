@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# Publish lingua-slim to PyPI (multi-version wheels)
+# Publish lingua-slim to PyPI (wheels + sdist)
 #
 # Usage: ./publish.sh <version>
-# Example: ./publish.sh 2.6.0
+# Example: ./publish.sh 2.8.0
 #
 
 set -e
@@ -36,10 +36,15 @@ echo "[3/6] Committing changes..."
 git add Cargo.toml Cargo.lock pyproject.toml
 git commit -m "feat: bump version to ${VERSION}"
 
-# 4. Build wheels for all Python versions
-echo "[4/6] Building wheels..."
+# 4. Build wheels for all Python versions + sdist
+echo "[4/6] Building wheels and sdist..."
 mkdir -p target/wheels
 
+# Build sdist first
+echo "  Building sdist..."
+maturin build --release --features python --out target/wheels --sdist
+
+# Build wheels for each Python version
 for py in 3.10 3.11 3.12 3.13 3.14; do
     INTERP=$(uv python list --only-installed | grep "cpython-${py}" | head -1 | awk '{print $2}')
     if [[ -n "$INTERP" ]]; then
@@ -57,7 +62,7 @@ if [[ -z "$WHEELS" ]]; then
     echo "Error: No wheels found for version ${VERSION}"
     exit 1
 fi
-pipx run twine upload target/wheels/lingua_slim-${VERSION}-*.whl
+pipx run twine upload target/wheels/lingua_slim-${VERSION}-*.whl target/wheels/lingua_slim-${VERSION}.tar.gz
 
 # 6. Verify
 echo "[6/6] Verifying on PyPI..."
