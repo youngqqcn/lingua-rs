@@ -153,11 +153,9 @@ Do NOT confuse with the main project commits in the parent directory.
 ### PyPI Status
 
 - Package: `lingua-slim`
-- Latest version: 2.7.0
+- Latest version: 2.8.0
 - Requires: Python >=3.10
-- Available wheels:
-  - `lingua_slim-2.7.0-cp310-cp310-manylinux_2_34_x86_64.whl` (Python 3.10)
-  - `lingua_slim-2.7.0-cp311-cp311-manylinux_2_34_x86_64.whl` (Python 3.11)
-  - `lingua_slim-2.7.0-cp312-cp312-manylinux_2_34_x86_64.whl` (Python 3.12)
-  - `lingua_slim-2.7.0-cp313-cp313-manylinux_2_34_x86_64.whl` (Python 3.13)
-  - `lingua_slim-2.7.0-cp314-cp314-manylinux_2_34_x86_64.whl` (Python 3.14)
+- Available packages:
+  - 5 wheels: cp310, cp311, cp312, cp313, cp314
+  - **Source distribution (sdist)** ← for cross-platform compatibility
+  - `lingua_slim-2.8.0.tar.gz`
