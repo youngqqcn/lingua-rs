@@ -74,57 +74,72 @@ The `lingua-rs/` directory is a **separate Rust project** that publishes `lingua
 - **Package installation**: Always use `uv add`, NOT `pip install` directly
 - **Chinese variant detection**: Uses OpenCC conversion comparison (reliable), not Unicode ranges
 - **lingua-slim import**: Use `from lingua import LanguageDetector`, NOT `from lingua_slim`
-- **Poetry compatibility issue**: Poetry may fail with "Unable to find installation candidates" if `requires-python` doesn't match the environment. Solution: set `requires-python = ">=3.12"`
+- **Poetry compatibility issue**: Poetry may fail with "Unable to find installation candidates" if `requires-python` doesn't match the environment. Solution: Build wheels for ALL Python versions (3.10-3.14) so Poetry can find a matching binary wheel
 
-## Publishing lingua-slim to PyPI
+## Publishing lingua-slim to PyPI (Multi-Version Wheels)
 
 ### Prerequisites
 
-- Python 3.12 only (MUST)
+- Python 3.12 only (MUST) for building
 - `maturin` installed (`pipx install maturin`)
 - PyPI token in `~/.pypirc`
+- `uv` for managing Python versions
 
 ### Publishing Steps
 
-1. **Pin Python version**:
-   ```bash
-   uv python pin 3.12
-   ```
-
-2. **Update version** in `lingua-rs/Cargo.toml`:
+1. **Update version** in `lingua-rs/Cargo.toml`:
    ```toml
    [package]
    name = "lingua"
    version = "2.5.0"  # Update this
    ```
 
-3. **Update classifiers** in `lingua-rs/pyproject.toml` (only list 3.12):
+2. **Update version** in `lingua-rs/pyproject.toml`:
    ```toml
-   classifiers = [
-       ...
-       "Programming Language :: Python :: 3.12",  # Only 3.12, remove 3.13/3.14
-       ...
-   ]
+   [project]
+   version = "2.5.0"  # Update this
    ```
 
-4. **Commit lingua-rs changes** (separate git repo):
+3. **Commit lingua-rs changes** (separate git repo):
    ```bash
    cd lingua-rs
    git add Cargo.toml Cargo.lock pyproject.toml
    git commit -m "feat: bump version to x.x.x"
    ```
 
-5. **Build wheel**:
+4. **Build wheels for all Python versions**:
    ```bash
    cd lingua-rs
-   maturin build --interpreter /usr/bin/python3.12 --release
+
+   # Python 3.10
+   maturin build --interpreter $(uv python list --only-installed | grep 3.10 | head -1 | awk '{print $2}') --release --out target/wheels
+
+   # Python 3.11
+   maturin build --interpreter $(uv python list --only-installed | grep 3.11 | head -1 | awk '{print $2}') --release --out target/wheels
+
+   # Python 3.12
+   maturin build --interpreter $(uv python list --only-installed | grep 3.12 | head -1 | awk '{print $2}') --release --out target/wheels
+
+   # Python 3.13
+   maturin build --interpreter $(uv python list --only-installed | grep 3.13 | head -1 | awk '{print $2}') --release --out target/wheels
+
+   # Python 3.14
+   maturin build --interpreter $(uv python list --only-installed | grep 3.14 | head -1 | awk '{print $2}') --release --out target/wheels
    ```
+   - All wheels will be in `target/wheels/` directory
    - `dist/`, `*.whl`, `uv.lock` are gitignored (build artifacts)
 
-6. **Upload to PyPI**:
+5. **Upload all wheels to PyPI**:
    ```bash
-   twine upload --skip-existing target/wheels/lingua_slim-*.whl
+   twine upload target/wheels/lingua_slim-*.whl
    ```
+
+6. **Verify on PyPI**:
+   ```bash
+   curl -s https://pypi.org/pypi/lingua-slim/<version>/json | python3 -c "import sys,json; d=json.load(sys.stdin); print('Available wheels:'); [print(' ', w['filename']) for w in d['urls']]"
+   ```
+
+7. **Update parent repo CLAUDE.md** with new PyPI status
 
 ### ⚠️ Important: Separate Git Repository
 
@@ -141,9 +156,9 @@ Do NOT confuse with the main project commits in the parent directory.
 ### Key Lessons
 
 - **Binary-only package**: `lingua-slim` publishes only `.whl` files, no `sdist`
-- **Poetry compatibility**: Poetry fails with "Unable to find installation candidates" when `requires-python` doesn't match environment - set `requires-python = ">=3.12"`
-- **uv advantage**: `uv pip install` handles binary wheels better than Poetry
-- **Python 3.12 ONLY**: Coze plugin uses Python 3.12, so PyPI must host cp312 wheels
+- **Poetry compatibility root cause**: Poetry validates ALL Python versions allowed by `requires-python` against available wheels. If any version lacks a wheel, Poetry rejects the entire package
+- **Solution: multi-version wheels**: Build wheels for all Python versions (3.10, 3.11, 3.12, 3.13, 3.14) so Poetry can find a matching binary wheel regardless of environment
+- **uv advantage**: `uv pip install` handles binary wheels better than Poetry - it can pick the best matching wheel
 - **twine upload**: Use `twine upload` instead of curl - it properly handles version management
 - **--skip-existing**: Only skips if exact filename exists; for new versions, use `twine upload` without this flag
 - **curl upload issue**: curl returns 404 even when upload succeeds (file already exists on PyPI), making it unreliable for verification
