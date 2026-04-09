@@ -460,8 +460,8 @@ class LanguageDetector:
                 # 历史记录至少4条以上才进行历史判断
                 if total > 3:
                     dominant_lang = max(hist_lang_counts, key=lambda k: hist_lang_counts[k])
-                    # 如果dominant语言出现次数超过90%，使用它
-                    if hist_lang_counts[dominant_lang] / total >= 0.9:
+                    # 如果dominant语言出现次数超过70%，使用它
+                    if hist_lang_counts[dominant_lang] / total >= 0.7:
                         return dominant_lang
 
         return self._detect_base(text)
