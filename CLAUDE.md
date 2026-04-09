@@ -1,12 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
 Language detection utility that processes `data1.csv` and outputs language-labeled results to `result2.csv`. Supports detecting Chinese (Simplified/Traditional/Cantonese), English, French, Japanese, Korean, and other languages.
 
-**⚠️ IMPORTANT: This project uses Python 3.12 ONLY. Do NOT use Python 3.13.**
+**⚠️ IMPORTANT: This project uses Python 3.12 for development. lingua-slim package supports Python 3.10-3.14.**
 
 ## Project Structure
 
