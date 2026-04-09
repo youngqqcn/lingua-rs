@@ -153,10 +153,10 @@ Do NOT confuse with the main project commits in the parent directory.
 ### PyPI Status
 
 - Package: `lingua-slim`
-- Latest version: 2.5.0
+- Latest version: 2.6.0
 - Available wheels:
-  - `lingua_slim-2.5.0-cp310-cp310-manylinux_2_34_x86_64.whl` (Python 3.10)
-  - `lingua_slim-2.5.0-cp311-cp311-manylinux_2_34_x86_64.whl` (Python 3.11)
-  - `lingua_slim-2.5.0-cp312-cp312-manylinux_2_34_x86_64.whl` (Python 3.12)
-  - `lingua_slim-2.5.0-cp313-cp313-manylinux_2_34_x86_64.whl` (Python 3.13)
-  - `lingua_slim-2.5.0-cp314-cp314-manylinux_2_34_x86_64.whl` (Python 3.14)
+  - `lingua_slim-2.6.0-cp310-cp310-manylinux_2_34_x86_64.whl` (Python 3.10)
+  - `lingua_slim-2.6.0-cp311-cp311-manylinux_2_34_x86_64.whl` (Python 3.11)
+  - `lingua_slim-2.6.0-cp312-cp312-manylinux_2_34_x86_64.whl` (Python 3.12)
+  - `lingua_slim-2.6.0-cp313-cp313-manylinux_2_34_x86_64.whl` (Python 3.13)
+  - `lingua_slim-2.6.0-cp314-cp314-manylinux_2_34_x86_64.whl` (Python 3.14)
