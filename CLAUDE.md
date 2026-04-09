@@ -88,7 +88,7 @@ The `lingua-rs/` directory is a **separate Rust project** that publishes `lingua
 **Option A: Use the publish script (recommended)**
 ```bash
 cd lingua-rs
-./publish.sh 2.6.0
+./publish.sh 2.8.0
 ```
 
 **Option B: Manual steps**
@@ -112,13 +112,16 @@ cd lingua-rs
    git add Cargo.toml Cargo.lock pyproject.toml
    git commit -m "feat: bump version to x.x.x"
 
+   # Build sdist first
+   maturin build --release --features python --out target/wheels --sdist
+
    # Build all wheels
    for py in 3.10 3.11 3.12 3.13 3.14; do
-       maturin build --interpreter $(uv python list --only-installed | grep "cpython-${py}" | head -1 | awk '{print $2}') --release --out target/wheels
+       maturin build --interpreter $(uv python list --only-installed | grep "cpython-${py}" | head -1 | awk '{print $2}') --release --features python --out target/wheels
    done
 
-   # Upload
-   twine upload target/wheels/lingua_slim-x.x.x-*.whl
+   # Upload wheels + sdist
+   pipx run twine upload target/wheels/lingua_slim-x.x.x-*.whl target/wheels/lingua_slim-x.x.x.tar.gz
    ```
 
 4. **Verify on PyPI**:
@@ -142,13 +145,11 @@ Do NOT confuse with the main project commits in the parent directory.
 
 ### Key Lessons
 
-- **Binary-only package**: `lingua-slim` publishes only `.whl` files, no `sdist`
-- **Poetry compatibility root cause**: Poetry validates ALL Python versions allowed by `requires-python` against available wheels. If any version lacks a wheel, Poetry rejects the entire package
-- **Solution: multi-version wheels**: Build wheels for all Python versions (3.10, 3.11, 3.12, 3.13, 3.14) so Poetry can find a matching binary wheel regardless of environment
+- **Binary wheels + sdist**: Always publish both wheels AND source distribution (sdist) for cross-platform compatibility
+- **Poetry compatibility root cause**: Poetry filters out wheels that don't match the target environment (CPU arch, glibc version). Without sdist, there's no fallback
+- **Solution: wheels + sdist**: Publish wheels for common platforms (3.10-3.14) AND sdist for environments where no wheel matches
 - **uv advantage**: `uv pip install` handles binary wheels better than Poetry - it can pick the best matching wheel
 - **twine upload**: Use `twine upload` instead of curl - it properly handles version management
-- **--skip-existing**: Only skips if exact filename exists; for new versions, use `twine upload` without this flag
-- **curl upload issue**: curl returns 404 even when upload succeeds (file already exists on PyPI), making it unreliable for verification
 
 ### PyPI Status
 
