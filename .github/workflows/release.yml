@@ -21,27 +21,98 @@ on:
       - 'v*'
 
 jobs:
-  build:
-    name: Build wheels and sdist
-
+  linux-build:
+    name: Build on Linux
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Build wheels for all Python versions
+      - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           args: --release --features python --out dist -i 3.10 3.11 3.12 3.13 3.14
           sccache: 'true'
           manylinux: auto
 
-      - name: Build source distribution
+      - name: Upload wheels
+        uses: actions/upload-artifact@v5
+        with:
+          name: linux-wheels
+          path: dist
+
+  windows-build:
+    name: Build on Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          args: --release --features python --out dist -i 3.10 3.11 3.12 3.13 3.14
+          sccache: 'true'
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v5
+        with:
+          name: windows-wheels
+          path: dist
+
+  macos-build:
+    name: Build on macOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          args: --release --features python --out dist -i 3.10 3.11 3.12 3.13 3.14
+          sccache: 'true'
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v5
+        with:
+          name: macos-wheels
+          path: dist
+
+  sdist-build:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
           args: --release --features python --out dist --sdist
           sccache: 'true'
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v5
+        with:
+          name: sdist
+          path: dist
+
+  publish:
+    name: Publish to PyPI
+    needs: [linux-build, windows-build, macos-build, sdist-build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: wheels
+          merge-multiple: true
 
       - name: Upload to PyPI
         uses: PyO3/maturin-action@v1
@@ -49,4 +120,4 @@ jobs:
           MATURIN_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         with:
           command: upload
-          args: --skip-existing dist/*
+          args: --skip-existing wheels/*
