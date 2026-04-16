@@ -545,19 +545,24 @@ class LanguageDetector:
                 if total == 1 and ratio == 1.0:
                     return dominant_lang
 
-                # 拼接方案：处理短英文文本被误判为马来语的情况
-                # 例如 "BTS world tour in malaysia" 被误判为 Malay
+                # 拼接方案：处理短文本被误判为其他拉丁语系的情况
+                # 只有当历史是英文或拉丁语系时才使用拼接，中文历史保持原有行为
                 base_result = self._detect_base(stripped)
-                if base_result in ("Malay", "Indonesian"):
-                    # 检查是否是 "in + country" 模式
+                latin_languages = ("Spanish", "French", "Portuguese", "Italian", "Malay", "Indonesian", "German")
+                non_chinese_history = dominant_lang in ("English",) + latin_languages
+
+                if base_result in latin_languages and non_chinese_history:
+                    # 检查是否是 "in + country" 模式 或 包含常见英文词
                     text_lower = stripped.lower()
                     words = text_lower.split()
-                    if 'in' in words:
-                        english_word_count = sum(1 for w in words if w in self.COMMON_ENGLISH_WORDS or len(w) > 4)
-                        if english_word_count >= len(words) * 0.5:
-                            # 使用拼接后检测
-                            combined_text = stripped + ' ' + ' '.join(valid_history_texts)
-                            combined_result = self._detect_base(combined_text)
+                    english_word_count = sum(1 for w in words if w in self.COMMON_ENGLISH_WORDS or len(w) > 4)
+
+                    # 如果文本包含较多英文词或 "in + country" 模式，尝试拼接
+                    if english_word_count >= len(words) * 0.4 or ('in' in words and english_word_count >= 1):
+                        combined_text = stripped + ' ' + ' '.join(valid_history_texts)
+                        combined_result = self._detect_base(combined_text)
+                        # 如果拼接后结果与历史主导语言一致，或拼接后为English，使用拼接结果
+                        if combined_result in hist_lang_counts or combined_result == "English":
                             return combined_result
 
         return self._detect_base(text)
