@@ -519,28 +519,46 @@ class LanguageDetector:
         should_use_history = bool(text_is_short_or_pure) and history
 
         if should_use_history:
-            hist_lang_counts: dict[str, int] = {}
+            # 收集有效历史文本
+            valid_history_texts = []
             for hist_text in history or []:
                 hist_normalized = self._normalize_text(hist_text)
                 if self._is_valid_history_text(hist_normalized):
-                    hist_result = self._detect_base(hist_normalized)
+                    valid_history_texts.append(hist_normalized)
+
+            if valid_history_texts:
+                # 统计历史语言分布
+                hist_lang_counts: dict[str, int] = {}
+                for hist_text in valid_history_texts:
+                    hist_result = self._detect_base(hist_text)
                     hist_lang_counts[hist_result] = hist_lang_counts.get(hist_result, 0) + 1
 
-            # 找到出现最多的语言
-            if hist_lang_counts:
                 total = sum(hist_lang_counts.values())
                 dominant_lang = max(hist_lang_counts, key=lambda k: hist_lang_counts[k])
                 ratio = hist_lang_counts[dominant_lang] / total
 
-                # 历史判断逻辑：
-                # - 至少需要4条有效历史记录，且
-                # - dominant语言比例超过70%
-                # - 但如果只有1条历史且是100%中文，短文本也应该采纳
+                # 历史判断逻辑（原有行为）：
+                # - 4条以上且70%阈值，或
+                # - 只有1条且100%同一种语言
                 if total >= 4 and ratio >= 0.7:
                     return dominant_lang
-                # 只有1条历史记录时，如果是100%同一种语言，短文本采纳
                 if total == 1 and ratio == 1.0:
                     return dominant_lang
+
+                # 拼接方案：处理短英文文本被误判为马来语的情况
+                # 例如 "BTS world tour in malaysia" 被误判为 Malay
+                base_result = self._detect_base(stripped)
+                if base_result in ("Malay", "Indonesian"):
+                    # 检查是否是 "in + country" 模式
+                    text_lower = stripped.lower()
+                    words = text_lower.split()
+                    if 'in' in words:
+                        english_word_count = sum(1 for w in words if w in self.COMMON_ENGLISH_WORDS or len(w) > 4)
+                        if english_word_count >= len(words) * 0.5:
+                            # 使用拼接后检测
+                            combined_text = stripped + ' ' + ' '.join(valid_history_texts)
+                            combined_result = self._detect_base(combined_text)
+                            return combined_result
 
         return self._detect_base(text)
 
