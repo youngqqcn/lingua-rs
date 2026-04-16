@@ -451,16 +451,31 @@ class LanguageDetector:
             return "English"
 
         # 最后用lingua检测Latin语言
+        lingua_result = None
         try:
             detector = self._get_lingua_detector()
             result = detector.detect_language_of(text)
             if result:
-                # 短文本结果特殊处理
-                if len(text) <= 10 and result == Language.SPANISH and text_lower in self.COMMON_ENGLISH_WORDS:
-                    return "English"
-                return self.LINGUA_LANG_MAP.get(result, "English")
+                lingua_result = result
         except Exception:
             pass
+
+        if lingua_result:
+            # 短文本结果特殊处理
+            if len(text) <= 10 and text_lower in self.COMMON_ENGLISH_WORDS:
+                return "English"
+
+            # 启发式规则：处理 "in + country_name" 模式
+            # 例如 "BTS world tour in malaysia" 应该是英文，不是马来语
+            if lingua_result in (Language.MALAY, Language.INDONESIAN):
+                words = text_lower.split()
+                english_word_count = sum(1 for w in words if w in self.COMMON_ENGLISH_WORDS or w in ('bts', 'world', 'tour', 'tickets', 'fantopia'))
+
+                # 如果文本包含 "in" 介词且有很多英文单词，则判定为英文
+                if 'in' in words and english_word_count >= len(words) * 0.5:
+                    return "English"
+
+            return self.LINGUA_LANG_MAP.get(lingua_result, "English")
 
         return "English"
 
